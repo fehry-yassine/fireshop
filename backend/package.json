@@ -1,0 +1,33 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NestJS backend for the LocalMarket PFE marketplace.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "nest build",
+    "start": "node --env-file=.env ./node_modules/@nestjs/cli/bin/nest.js start",
+    "start:dev": "node --env-file=.env ./node_modules/@nestjs/cli/bin/nest.js start --watch",
+    "start:prod": "node --env-file=.env dist/main",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:status": "prisma migrate status",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.19",
+    "@nestjs/core": "^11.1.19",
+    "@nestjs/platform-express": "^11.1.19",
+    "@prisma/client": "^6.19.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.21",
+    "@types/node": "^25.6.0",
+    "prisma": "^6.19.3",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^6.0.3"
+  }
+}
