@@ -6,9 +6,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "start": "node --env-file=.env ./node_modules/@nestjs/cli/bin/nest.js start",
-    "start:dev": "node --env-file=.env ./node_modules/@nestjs/cli/bin/nest.js start --watch",
-    "start:prod": "node --env-file=.env dist/main",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:status": "prisma migrate status",
