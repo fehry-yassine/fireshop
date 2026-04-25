@@ -1,0 +1,18 @@
+flowchart LR
+    buyer["Buyer"]
+    vendor["Vendor"]
+    admin["Admin"]
+    frontend["Next.js Frontend"]
+    backend["NestJS REST API"]
+    rules["Business Rules: RBAC, COD, Category Depth, Single-Vendor Checkout"]
+    prisma["Prisma ORM"]
+    db["PostgreSQL"]
+
+    buyer --> frontend
+    vendor --> frontend
+    admin --> frontend
+    frontend --> backend
+    backend --> rules
+    rules --> prisma
+    prisma --> db
+

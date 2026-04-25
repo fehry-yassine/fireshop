@@ -1,0 +1,17 @@
+erDiagram
+    USERS ||--o| VENDORS : "can own"
+    USERS ||--o{ ORDERS : "places"
+    USERS ||--o{ CART_ITEMS : "has"
+
+    VENDORS ||--o{ PRODUCTS : "sells"
+    VENDORS ||--o{ ORDERS : "receives"
+
+    CATEGORIES ||--o{ PRODUCTS : "contains"
+    CATEGORIES ||--o{ CATEGORIES : "parent of"
+
+    PRODUCTS ||--o{ PRODUCT_IMAGES : "has"
+    PRODUCTS ||--o{ CART_ITEMS : "appears in"
+    PRODUCTS ||--o{ ORDER_ITEMS : "ordered as"
+
+    ORDERS ||--o{ ORDER_ITEMS : "contains"
+
