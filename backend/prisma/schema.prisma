@@ -85,11 +85,14 @@ model Category {
   slug        String     @unique
   description String?
   parentId    String?
+  isActive    Boolean    @default(true)
   parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children    Category[] @relation("CategoryTree")
   products    Product[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  @@index([parentId, isActive])
 }
 
 model Product {
@@ -185,4 +188,3 @@ model OrderItem {
 
   @@index([orderId])
 }
-
