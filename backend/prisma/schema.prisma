@@ -71,12 +71,16 @@ model Vendor {
   description    String?
   logoUrl        String?
   status         VendorStatus @default(PENDING)
+  isActive       Boolean      @default(false)
+  adminNote      String?
   commissionRate Decimal      @default(8.00) @db.Decimal(5, 2)
   user           User         @relation(fields: [userId], references: [id])
   products       Product[]
   orders         Order[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+
+  @@index([status, isActive])
 }
 
 model Category {

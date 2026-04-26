@@ -1,25 +1,67 @@
-import { Body, Controller, Delete, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { Role } from '@prisma/client';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { CategoriesService } from '../categories/categories.service';
+import { VendorsService } from '../vendors/vendors.service';
 
 @Controller('admin')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
 export class AdminController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly vendorsService: VendorsService,
+  ) {}
 
-  // TODO: Protect this route with an admin-only guard when auth is implemented.
   @Post('categories')
   createCategory(@Body() body: unknown) {
     return this.categoriesService.createAdmin(body ?? {});
   }
 
-  // TODO: Protect this route with an admin-only guard when auth is implemented.
   @Patch('categories/:id')
   updateCategory(@Param('id') id: string, @Body() body: unknown) {
     return this.categoriesService.updateAdmin(id, body ?? {});
   }
 
-  // TODO: Protect this route with an admin-only guard when auth is implemented.
   @Delete('categories/:id')
   deleteCategory(@Param('id') id: string) {
     return this.categoriesService.softDeleteAdmin(id);
+  }
+
+  @Get('vendors/applications')
+  findVendorApplications(@Query('status') status?: string) {
+    return this.vendorsService.findApplicationsAdmin(status);
+  }
+
+  @Patch('vendors/applications/:id/approve')
+  approveVendorApplication(@Param('id') id: string, @Body() body: unknown) {
+    return this.vendorsService.approveApplicationAdmin(id, body ?? {});
+  }
+
+  @Patch('vendors/applications/:id/reject')
+  rejectVendorApplication(@Param('id') id: string, @Body() body: unknown) {
+    return this.vendorsService.rejectApplicationAdmin(id, body ?? {});
+  }
+
+  @Get('vendors')
+  findVendors(@Query('status') status?: string) {
+    return this.vendorsService.findAllAdmin(status);
+  }
+
+  @Patch('vendors/:id')
+  updateVendor(@Param('id') id: string, @Body() body: unknown) {
+    return this.vendorsService.updateAdmin(id, body ?? {});
   }
 }
