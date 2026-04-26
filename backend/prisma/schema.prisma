@@ -23,7 +23,7 @@ enum VendorStatus {
 enum ProductStatus {
   DRAFT
   PENDING_APPROVAL
-  APPROVED
+  PUBLISHED
   REJECTED
   ARCHIVED
 }
@@ -106,6 +106,7 @@ model Product {
   offerPrice    Decimal?       @db.Decimal(10, 2)
   stockQuantity Int            @default(0)
   status        ProductStatus  @default(DRAFT)
+  isActive      Boolean        @default(true)
   isFeatured    Boolean        @default(false)
   isOnOffer     Boolean        @default(false)
   vendor        Vendor         @relation(fields: [vendorId], references: [id])
@@ -116,9 +117,10 @@ model Product {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  @@unique([vendorId, slug])
+  @@unique([slug])
   @@index([name])
-  @@index([status, categoryId])
+  @@index([status, isActive, categoryId])
+  @@index([vendorId])
   @@index([isFeatured, isOnOffer])
 }
 
