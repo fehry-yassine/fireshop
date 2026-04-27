@@ -14,8 +14,8 @@ export function ProductCard({ product }: ProductCardProps) {
   const displayPrice = product.offerPrice ?? product.price;
 
   return (
-    <Card className="overflow-hidden">
-      <Link className="block" href={`/product/${product.slug}`}>
+    <Link className="block h-full" href={`/product/${product.slug}`}>
+      <Card className="h-full overflow-hidden transition-shadow hover:shadow-soft">
         <div className="flex aspect-square items-center justify-center bg-slate-100">
           {image?.url ? (
             <img
@@ -29,30 +29,27 @@ export function ProductCard({ product }: ProductCardProps) {
             </span>
           )}
         </div>
-      </Link>
-      <CardContent className="space-y-3">
-        <div className="space-y-1">
-          <Link
-            className="line-clamp-2 min-h-10 text-sm font-semibold text-slate-950 hover:text-market-700"
-            href={`/product/${product.slug}`}
-          >
-            {product.name}
-          </Link>
-          <p className="truncate text-xs text-slate-500">
-            {product.vendor?.storeName ?? "Local vendor"}
-          </p>
-        </div>
-
-        <div className="flex items-end justify-between gap-2">
-          <div>
-            <p className="text-base font-bold text-slate-950">{formatTnd(displayPrice)}</p>
-            {hasOffer ? (
-              <p className="text-xs text-slate-400 line-through">{formatTnd(product.price)}</p>
-            ) : null}
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <h3 className="line-clamp-2 min-h-10 text-sm font-semibold text-slate-950">
+              {product.name}
+            </h3>
+            <p className="truncate text-xs text-slate-500">
+              {product.vendor?.storeName ?? "Local vendor"}
+            </p>
           </div>
-          {hasOffer ? <Badge tone="warning">Offer</Badge> : null}
-        </div>
-      </CardContent>
-    </Card>
+
+          <div className="flex items-end justify-between gap-2">
+            <div>
+              <p className="text-base font-bold text-slate-950">{formatTnd(displayPrice)}</p>
+              {hasOffer ? (
+                <p className="text-xs text-slate-400 line-through">{formatTnd(product.price)}</p>
+              ) : null}
+            </div>
+            {hasOffer ? <Badge tone="warning">Offer</Badge> : null}
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
