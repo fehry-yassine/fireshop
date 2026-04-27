@@ -32,13 +32,13 @@ export default async function HomePage() {
 
   return (
     <main>
-      <section className="border-b border-slate-200 bg-white">
-        <Container className="py-6 sm:py-8">
-          <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <section className="border-b border-slate-200/80 bg-white">
+        <Container className="py-6 sm:py-9">
+          <div className="grid gap-5 lg:grid-cols-[272px_minmax(0,1fr)]">
             <CategorySidebar categories={categories} />
 
             <div className="space-y-6">
-              <div className="space-y-4 border-b border-slate-200 pb-6">
+              <div className="space-y-4 rounded-lg border border-slate-200/80 bg-slate-50/70 p-5 sm:p-6">
                 <Badge tone="success">Tunisia marketplace</Badge>
                 <div className="max-w-3xl space-y-3">
                   <h1 className="text-3xl font-bold tracking-normal text-slate-950 sm:text-4xl">
@@ -48,7 +48,11 @@ export default async function HomePage() {
                     Browse products from Tunisian sellers across everyday categories.
                   </p>
                 </div>
-                <form action="/" className="flex max-w-2xl flex-col gap-2 sm:flex-row" role="search">
+                <form
+                  action="/"
+                  className="flex max-w-2xl flex-col gap-2 sm:flex-row"
+                  role="search"
+                >
                   <Input
                     aria-label="Search marketplace"
                     name="q"

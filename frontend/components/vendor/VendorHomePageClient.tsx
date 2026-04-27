@@ -152,10 +152,10 @@ function VendorOverview({ vendor }: { vendor: Vendor }) {
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card>
-      <CardContent className="space-y-1">
+    <Card className="bg-white/95">
+      <CardContent className="space-y-1.5">
         <p className="text-sm text-slate-500">{label}</p>
-        <p className="text-2xl font-bold text-slate-950">{value}</p>
+        <p className="text-2xl font-bold leading-none text-slate-950">{value}</p>
       </CardContent>
     </Card>
   );
@@ -163,7 +163,7 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 
 function RecentOrderRow({ order }: { order: Order }) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-200/50 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <OrderStatusBadge status={order.status} />

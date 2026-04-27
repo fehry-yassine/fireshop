@@ -16,11 +16,16 @@ html {
 
 body {
   margin: 0;
-  background: #f6f7f9;
-  color: #111827;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+::selection {
+  background: #fed7aa;
+  color: #111827;
 }

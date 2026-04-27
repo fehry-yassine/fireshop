@@ -22,9 +22,9 @@ export function VendorDashboardFrame({ children, vendor }: VendorDashboardFrameP
   const pathname = usePathname();
 
   return (
-    <section className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+    <section className="grid gap-6 lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="lg:sticky lg:top-24 lg:self-start">
-        <Card>
+        <Card className="bg-white/95">
           <CardContent className="space-y-5">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-normal text-market-700">
@@ -37,12 +37,12 @@ export function VendorDashboardFrame({ children, vendor }: VendorDashboardFrameP
               <VendorStatusBadge status={vendor.status ?? "APPROVED"} />
             </div>
 
-            <nav className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
+            <nav className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
               {vendorLinks.map((item) => (
                 <Link
                   className={cn(
-                    "shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950",
-                    pathname === item.href && "bg-slate-100 text-slate-950",
+                    "shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2",
+                    pathname === item.href && "bg-market-50 text-market-800",
                   )}
                   href={item.href}
                   key={item.href}

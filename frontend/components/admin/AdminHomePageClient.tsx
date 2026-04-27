@@ -210,17 +210,23 @@ function MetricCard({
   value: string;
 }) {
   return (
-    <Card>
-      <CardContent className="space-y-1">
+    <Card className="bg-white/95">
+      <CardContent className="space-y-1.5">
         <p className="text-sm text-slate-500">{label}</p>
-        <p className="text-2xl font-bold text-slate-950">{isLoading ? "--" : value}</p>
+        <p className="text-2xl font-bold leading-none text-slate-950">
+          {isLoading ? "--" : value}
+        </p>
       </CardContent>
     </Card>
   );
 }
 
 function EmptyPanel({ text }: { text: string }) {
-  return <p className="rounded-lg bg-slate-50 px-3 py-4 text-sm text-slate-500">{text}</p>;
+  return (
+    <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+      {text}
+    </p>
+  );
 }
 
 function VendorStatusBadge({ status }: { status: VendorApplication["status"] }) {

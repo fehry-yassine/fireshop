@@ -66,13 +66,13 @@ export function AuthNav() {
   return (
     <nav
       aria-label="Main navigation"
-      className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700 lg:justify-end"
+      className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-slate-700 lg:justify-end"
     >
       {links.map((item) => (
         <Link
           className={cn(
-            "rounded-md px-2.5 py-2 transition-colors hover:bg-slate-100 hover:text-slate-950",
-            pathname === item.href && "bg-slate-100 text-slate-950",
+            "rounded-lg px-2.5 py-2 whitespace-nowrap transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2",
+            pathname === item.href && "bg-market-50 text-market-800",
           )}
           href={item.href}
           key={item.href}
@@ -93,13 +93,13 @@ export function AuthNav() {
       ) : (
         <>
           <Link
-            className="rounded-md px-2.5 py-2 transition-colors hover:bg-slate-100 hover:text-slate-950"
+            className="rounded-lg px-2.5 py-2 whitespace-nowrap transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2"
             href="/auth/login"
           >
             Sign in
           </Link>
           <Link
-            className="rounded-lg bg-slate-950 px-3 py-2 text-white transition-colors hover:bg-slate-800"
+            className="rounded-lg bg-slate-950 px-3 py-2 whitespace-nowrap text-white shadow-sm shadow-slate-900/20 transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2"
             href="/auth/register"
           >
             Create account
