@@ -7,7 +7,8 @@ import type {
   Vendor,
 } from "@/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+const SERVER_API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 
 type QueryValue = string | number | boolean | null | undefined;
 type ApiQuery = Record<string, QueryValue>;
@@ -50,8 +51,28 @@ export class ApiError extends Error {
   }
 }
 
+function getApiBaseUrl() {
+  if (typeof window === "undefined") {
+    return SERVER_API_URL;
+  }
+
+  if (
+    !SERVER_API_URL ||
+    SERVER_API_URL.startsWith("http://localhost:4000") ||
+    SERVER_API_URL.startsWith("http://127.0.0.1:4000")
+  ) {
+    return "/api";
+  }
+
+  return SERVER_API_URL;
+}
+
 function buildUrl(path: string, query?: ApiQuery) {
-  const url = new URL(`${API_URL}${path}`);
+  const baseUrl = getApiBaseUrl();
+  const url = new URL(
+    `${baseUrl.replace(/\/$/, "")}${path}`,
+    typeof window === "undefined" ? undefined : window.location.origin,
+  );
 
   Object.entries(query ?? {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {

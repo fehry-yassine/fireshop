@@ -8,6 +8,7 @@ export type PublicUser = {
   fullName: string;
   phone?: string | null;
   role: UserRole;
+  isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };
