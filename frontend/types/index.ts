@@ -86,11 +86,28 @@ export type CartResponse = {
   total: number;
 };
 
+export type OrderStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "PREPARING"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "CANCELLED";
+
 export type Order = {
   id: string;
-  status: string;
+  status: OrderStatus;
   paymentMethod: "CASH_ON_DELIVERY";
   paymentStatus: "UNPAID" | "PAID" | "CANCELLED";
+  shipping: {
+    fullName: string;
+    phone: string;
+    address: string;
+    addressLine2?: string | null;
+    city: string;
+    governorate?: string | null;
+    postalCode?: string | null;
+  };
   subtotal: number;
   deliveryFee: number;
   total: number;
