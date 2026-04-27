@@ -1,6 +1,7 @@
 export type MoneyValue = number | string;
 
 export type UserRole = "BUYER" | "VENDOR" | "ADMIN";
+export type VendorStatus = "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
 
 export type PublicUser = {
   id: string;
@@ -20,11 +21,18 @@ export type Vendor = {
   slug: string;
   description?: string | null;
   logoUrl?: string | null;
-  status?: "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
+  status?: VendorStatus;
   isActive?: boolean;
+  adminNote?: string | null;
   commissionRate?: MoneyValue;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type VendorApplication = Vendor & {
+  status: VendorStatus;
+  isActive: boolean;
+  user: PublicUser;
 };
 
 export type Category = {

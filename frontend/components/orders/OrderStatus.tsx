@@ -2,14 +2,18 @@ import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import type { OrderStatus } from "@/types";
 
-const ORDER_STEPS: OrderStatus[] = [
+export const ORDER_STATUS_OPTIONS: OrderStatus[] = [
   "PENDING",
   "CONFIRMED",
   "PREPARING",
   "SHIPPED",
   "DELIVERED",
+  "CANCELLED",
 ];
 
+const ORDER_STEPS: OrderStatus[] = ORDER_STATUS_OPTIONS.filter(
+  (status) => status !== "CANCELLED",
+);
 const TIMELINE_STATUSES: OrderStatus[] = [...ORDER_STEPS, "CANCELLED"];
 
 const STATUS_LABELS: Record<OrderStatus, string> = {

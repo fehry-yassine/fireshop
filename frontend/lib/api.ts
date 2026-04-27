@@ -2,9 +2,11 @@ import type {
   CartResponse,
   Category,
   Order,
+  OrderStatus,
   Product,
   PublicUser,
   Vendor,
+  VendorApplication,
 } from "@/types";
 
 const SERVER_API_URL =
@@ -168,14 +170,20 @@ export const products = {
 export const vendors = {
   list: () => request<Vendor[]>("/vendors"),
   getBySlug: (slug: string) => request<Vendor>(`/vendors/${slug}`),
-  me: () => request<Vendor>("/vendors/me"),
-  myApplication: () => request<Vendor>("/vendors/my-application"),
+  me: () => request<{ vendor: Vendor }>("/vendors/me"),
+  myApplication: () =>
+    request<{ application: VendorApplication | null }>("/vendors/my-application"),
   apply: (payload: { storeName: string; description?: string }) =>
-    request<Vendor>("/vendors/apply", {
+    request<{ application: VendorApplication }>("/vendors/apply", {
       method: "POST",
       body: payload,
     }),
   orders: () => request<Order[]>("/vendors/orders"),
+  updateOrderStatus: (id: string, status: OrderStatus) =>
+    request<{ order: Order }>(`/vendors/orders/${id}/status`, {
+      method: "PATCH",
+      body: { status },
+    }),
 };
 
 export const cart = {
