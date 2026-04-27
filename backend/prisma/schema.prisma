@@ -32,6 +32,7 @@ enum OrderStatus {
   PENDING
   CONFIRMED
   PREPARING
+  SHIPPED
   READY_FOR_DELIVERY
   DELIVERED
   CANCELLED
@@ -184,6 +185,7 @@ model OrderItem {
   orderId     String
   productId   String
   productName String
+  productSlug String
   unitPrice   Decimal  @db.Decimal(10, 2)
   quantity    Int
   subtotal    Decimal  @db.Decimal(10, 2)

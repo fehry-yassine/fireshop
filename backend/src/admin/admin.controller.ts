@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CategoriesService } from '../categories/categories.service';
+import { OrdersService } from '../orders/orders.service';
 import { VendorsService } from '../vendors/vendors.service';
 
 @Controller('admin')
@@ -22,6 +23,7 @@ import { VendorsService } from '../vendors/vendors.service';
 export class AdminController {
   constructor(
     private readonly categoriesService: CategoriesService,
+    private readonly ordersService: OrdersService,
     private readonly vendorsService: VendorsService,
   ) {}
 
@@ -63,5 +65,15 @@ export class AdminController {
   @Patch('vendors/:id')
   updateVendor(@Param('id') id: string, @Body() body: unknown) {
     return this.vendorsService.updateAdmin(id, body ?? {});
+  }
+
+  @Get('orders')
+  findOrders(@Query('status') status?: string) {
+    return this.ordersService.findAllAdmin(status);
+  }
+
+  @Patch('orders/:id/status')
+  updateOrderStatus(@Param('id') id: string, @Body() body: unknown) {
+    return this.ordersService.updateAdminOrderStatus(id, body ?? {});
   }
 }
