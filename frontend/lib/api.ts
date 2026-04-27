@@ -183,7 +183,15 @@ export const vendors = {
     request<{ order: Order }>(`/vendors/orders/${id}/status`, {
       method: "PATCH",
       body: { status },
-    }),
+  }),
+};
+
+type CategoryPayload = {
+  name: string;
+  slug?: string;
+  description?: string;
+  parentId?: string | null;
+  isActive?: boolean;
 };
 
 export const cart = {
@@ -218,7 +226,59 @@ export const orders = {
     }),
 };
 
+export const admin = {
+  vendors: {
+    applications: (query?: { status?: string }) =>
+      request<VendorApplication[]>("/admin/vendors/applications", { query }),
+    approveApplication: (id: string, payload?: { adminNote?: string }) =>
+      request<{ vendor: VendorApplication }>(
+        `/admin/vendors/applications/${id}/approve`,
+        {
+          method: "PATCH",
+          body: payload ?? {},
+        },
+      ),
+    rejectApplication: (id: string, payload: { adminNote: string }) =>
+      request<{ application: VendorApplication }>(
+        `/admin/vendors/applications/${id}/reject`,
+        {
+          method: "PATCH",
+          body: payload,
+        },
+      ),
+    list: (query?: { status?: string }) =>
+      request<VendorApplication[]>("/admin/vendors", { query }),
+  },
+  orders: {
+    list: (query?: { status?: OrderStatus }) =>
+      request<Order[]>("/admin/orders", { query }),
+    updateStatus: (id: string, status: OrderStatus) =>
+      request<{ order: Order }>(`/admin/orders/${id}/status`, {
+        method: "PATCH",
+        body: { status },
+      }),
+  },
+  categories: {
+    list: () => request<Category[]>("/categories"),
+    create: (payload: CategoryPayload) =>
+      request<Category>("/admin/categories", {
+        method: "POST",
+        body: payload,
+      }),
+    update: (id: string, payload: Partial<CategoryPayload>) =>
+      request<Category>(`/admin/categories/${id}`, {
+        method: "PATCH",
+        body: payload,
+      }),
+    delete: (id: string) =>
+      request<Category>(`/admin/categories/${id}`, {
+        method: "DELETE",
+      }),
+  },
+};
+
 export const api = {
+  admin,
   auth,
   cart,
   categories,
