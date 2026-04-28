@@ -4,10 +4,17 @@ import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { CategoriesModule } from '../categories/categories.module';
 import { OrdersModule } from '../orders/orders.module';
+import { ProductsModule } from '../products/products.module';
 import { VendorsModule } from '../vendors/vendors.module';
 
 @Module({
-  imports: [AuthModule, CategoriesModule, OrdersModule, VendorsModule],
+  imports: [
+    AuthModule,
+    CategoriesModule,
+    OrdersModule,
+    ProductsModule,
+    VendorsModule,
+  ],
   controllers: [AdminController],
   providers: [AdminService],
 })

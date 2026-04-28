@@ -47,6 +47,39 @@ This platform helps Tunisian local merchants and small businesses sell across mu
 `-- README.md             # Project overview
 ```
 
+## Run With Docker Compose + Nginx
+
+This repository includes a full local stack:
+
+- `postgres` database
+- `backend` NestJS API on internal port `4000`
+- `frontend` Next.js app on internal port `3000`
+- `nginx` reverse proxy exposed on `http://localhost`
+
+Start everything:
+
+```bash
+docker compose up --build
+```
+
+Stop everything:
+
+```bash
+docker compose down
+```
+
+Seed database in Docker (production-style):
+
+```bash
+docker compose --profile tools run --rm seed
+```
+
+After seeding, start app stack:
+
+```bash
+docker compose up -d backend frontend nginx
+```
+
 ## Week 1 Status
 
 Week 1 creates the professional foundation before coding:
@@ -68,3 +101,12 @@ Week 2 should start implementation only after the foundation is approved:
 3. Implement authentication with buyer, vendor, and admin roles.
 4. Build the first database migration.
 
+
+
+
+
+Seed completed.
+Shared password: Test@12345
+Admin: admin@localmarket.test
+Buyer: buyer.one@localmarket.test
+Vendor: seller.one@localmarket.test

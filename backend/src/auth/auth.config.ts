@@ -19,9 +19,14 @@ export function getJwtSecret() {
 }
 
 export function authCookieOptions() {
+  const secureOverride = process.env.AUTH_COOKIE_SECURE;
+  const secure =
+    secureOverride === 'true' ||
+    (secureOverride !== 'false' && process.env.NODE_ENV === 'production');
+
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     sameSite: 'lax' as const,
     maxAge: JWT_MAX_AGE_MS,
     path: '/',

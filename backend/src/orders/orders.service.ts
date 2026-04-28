@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   CartItem,
+  Category,
   Order,
   OrderItem,
   OrderStatus,
@@ -38,7 +39,10 @@ type StatusPayload = {
 };
 
 type CartItemWithProduct = CartItem & {
-  product: Product & { vendor: Vendor };
+  product: Product & {
+    category: Category;
+    vendor: Vendor & { user: User };
+  };
 };
 
 type OrderWithRelations = Order & {
@@ -80,7 +84,14 @@ export class OrdersService {
     const order = await this.prisma.$transaction(async (tx) => {
       const cartItems = await tx.cartItem.findMany({
         where: { userId: user.id },
-        include: { product: { include: { vendor: true } } },
+        include: {
+          product: {
+            include: {
+              category: true,
+              vendor: { include: { user: true } },
+            },
+          },
+        },
         orderBy: { createdAt: 'asc' },
       });
 
@@ -151,6 +162,12 @@ export class OrdersService {
             id: item.productId,
             isActive: true,
             status: ProductStatus.PUBLISHED,
+            category: { isActive: true },
+            vendor: {
+              isActive: true,
+              status: VendorStatus.APPROVED,
+              user: { isActive: true },
+            },
             stockQuantity: { gte: item.quantity },
           },
           data: {
@@ -304,6 +321,22 @@ export class OrdersService {
     ) {
       throw new BadRequestException(
         `${item.product.name} is not available for ordering`,
+      );
+    }
+
+    if (!item.product.category.isActive) {
+      throw new BadRequestException(
+        `${item.product.name} category is not available for ordering`,
+      );
+    }
+
+    if (
+      !item.product.vendor.isActive ||
+      item.product.vendor.status !== VendorStatus.APPROVED ||
+      !item.product.vendor.user.isActive
+    ) {
+      throw new BadRequestException(
+        `${item.product.name} vendor is not available for ordering`,
       );
     }
   }

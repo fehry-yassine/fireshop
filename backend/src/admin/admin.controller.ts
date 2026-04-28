@@ -15,6 +15,7 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CategoriesService } from '../categories/categories.service';
 import { OrdersService } from '../orders/orders.service';
+import { ProductsService } from '../products/products.service';
 import { VendorsService } from '../vendors/vendors.service';
 
 @Controller('admin')
@@ -24,6 +25,7 @@ export class AdminController {
   constructor(
     private readonly categoriesService: CategoriesService,
     private readonly ordersService: OrdersService,
+    private readonly productsService: ProductsService,
     private readonly vendorsService: VendorsService,
   ) {}
 
@@ -65,6 +67,26 @@ export class AdminController {
   @Patch('vendors/:id')
   updateVendor(@Param('id') id: string, @Body() body: unknown) {
     return this.vendorsService.updateAdmin(id, body ?? {});
+  }
+
+  @Get('products/pending')
+  findPendingProducts() {
+    return this.productsService.findPendingAdmin();
+  }
+
+  @Patch('products/:id/approve')
+  approveProduct(@Param('id') id: string) {
+    return this.productsService.approveProductAdmin(id);
+  }
+
+  @Patch('products/:id/reject')
+  rejectProduct(@Param('id') id: string) {
+    return this.productsService.rejectProductAdmin(id);
+  }
+
+  @Patch('products/:id/archive')
+  archiveProduct(@Param('id') id: string) {
+    return this.productsService.archiveProductAdmin(id);
   }
 
   @Get('orders')

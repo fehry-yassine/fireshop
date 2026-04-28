@@ -49,3 +49,37 @@ src/
 - Admin can see all marketplace activity.
 - Reviews, in-app notifications, online payment, chat, coupons, wishlist, delivery APIs, mobile apps, and AI features are not V1 scope.
 
+## Seed Data for E2E
+
+Use Prisma seed data to populate realistic test records for auth, vendor onboarding, products, cart, and COD orders.
+
+```bash
+npm run prisma:seed
+```
+
+Reset + migrate + seed from scratch:
+
+```bash
+npm run prisma:reset
+npm run prisma:seed
+```
+
+With Docker Compose:
+
+```bash
+docker compose --profile tools run --rm seed
+```
+
+Shared password for all seeded users:
+
+```text
+Test@12345
+```
+
+Key accounts:
+
+- `admin@localmarket.test` (ADMIN)
+- `buyer.one@localmarket.test` (BUYER)
+- `seller.one@localmarket.test` (APPROVED VENDOR)
+- `seller.pending@localmarket.test` (BUYER + pending vendor application)
+- `seller.rejected@localmarket.test` (BUYER + rejected vendor application)

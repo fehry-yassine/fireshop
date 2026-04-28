@@ -10,7 +10,10 @@ import type {
 } from "@/types";
 
 const SERVER_API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+  process.env.INTERNAL_API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:4000/api";
+const CLIENT_API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 type QueryValue = string | number | boolean | null | undefined;
 type ApiQuery = Record<string, QueryValue>;
@@ -59,14 +62,15 @@ function getApiBaseUrl() {
   }
 
   if (
-    !SERVER_API_URL ||
-    SERVER_API_URL.startsWith("http://localhost:4000") ||
-    SERVER_API_URL.startsWith("http://127.0.0.1:4000")
+    !CLIENT_API_URL ||
+    CLIENT_API_URL === "/api" ||
+    CLIENT_API_URL.startsWith("http://localhost:4000") ||
+    CLIENT_API_URL.startsWith("http://127.0.0.1:4000")
   ) {
     return "/api";
   }
 
-  return SERVER_API_URL;
+  return CLIENT_API_URL;
 }
 
 function buildUrl(path: string, query?: ApiQuery) {

@@ -1,10 +1,22 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { Prisma, ProductStatus } from '@prisma/client';
+import {
+  Category,
+  Prisma,
+  Product,
+  ProductStatus,
+  Role,
+  User,
+  Vendor,
+  VendorStatus,
+} from '@prisma/client';
+import { AuthTokenPayload } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 
 type ProductPayload = {
@@ -26,6 +38,20 @@ type PublicProductFilter = {
   categorySlug?: string;
 };
 
+type ProductWithRelations = Product & {
+  category: Category;
+  vendor: Vendor & { user: User };
+};
+
+const VENDOR_RESTRICTED_FIELDS: Array<keyof ProductPayload> = [
+  'vendorId',
+  'offerPrice',
+  'status',
+  'isActive',
+  'isFeatured',
+  'isOnOffer',
+];
+
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -43,62 +69,66 @@ export class ProductsService {
   }
 
   async findBySlugPublic(slug: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { slug },
+    const product = await this.prisma.product.findFirst({
+      where: {
+        slug,
+        ...this.publicWhere({}),
+      },
       include: this.productIncludes(),
     });
 
-    if (
-      !product ||
-      !product.isActive ||
-      product.status !== ProductStatus.PUBLISHED
-    ) {
+    if (!product) {
       throw new NotFoundException('Product not found');
     }
 
     return product;
   }
 
-  async createManage(payload: ProductPayload) {
-    const vendorId = this.requiredString(payload.vendorId, 'vendorId');
-    const categoryId = this.requiredString(payload.categoryId, 'categoryId');
-    const name = this.requiredString(payload.name, 'name');
-    const slug = this.normalizeSlug(payload.slug, name);
-    const description =
-      this.optionalString(payload.description) ?? 'No description provided.';
-    const price = this.positiveNumber(payload.price, 'price');
-    const offerPrice = this.optionalPositiveNumber(
-      payload.offerPrice,
-      'offerPrice',
-    );
-    const stockQuantity = this.nonNegativeInteger(
-      payload.stockQuantity,
-      'stockQuantity',
-      0,
-    );
+  async findVendorProducts(currentUser: AuthTokenPayload) {
+    const vendor = await this.findActiveVendorForUser(currentUser);
 
-    await this.validateVendor(vendorId);
+    return this.prisma.product.findMany({
+      where: { vendorId: vendor.id },
+      include: this.productIncludes(),
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createVendorProduct(
+    currentUser: AuthTokenPayload,
+    payload: unknown,
+  ) {
+    const vendor = await this.findActiveVendorForUser(currentUser);
+    const body = this.asPayload(payload);
+
+    this.rejectVendorRestrictedFields(body);
+
+    const categoryId = this.requiredString(body.categoryId, 'categoryId');
+    const name = this.requiredString(body.name, 'name');
+    const slug = this.normalizeSlug(body.slug, name);
+
     await this.validateCategory(categoryId);
 
     try {
       return await this.prisma.product.create({
         data: {
-          vendorId,
+          vendorId: vendor.id,
           categoryId,
           name,
           slug,
-          description,
-          price,
-          offerPrice,
-          stockQuantity,
-          status: this.optionalStatus(payload.status, ProductStatus.DRAFT),
-          isActive: this.optionalBoolean(payload.isActive, true, 'isActive'),
-          isFeatured: this.optionalBoolean(
-            payload.isFeatured,
-            false,
-            'isFeatured',
+          description:
+            this.optionalString(body.description, 'description') ??
+            'No description provided.',
+          price: this.positiveNumber(body.price, 'price'),
+          stockQuantity: this.nonNegativeInteger(
+            body.stockQuantity,
+            'stockQuantity',
+            0,
           ),
-          isOnOffer: this.optionalBoolean(payload.isOnOffer, false, 'isOnOffer'),
+          status: ProductStatus.PENDING_APPROVAL,
+          isActive: true,
+          isFeatured: false,
+          isOnOffer: false,
         },
         include: this.productIncludes(),
       });
@@ -107,80 +137,72 @@ export class ProductsService {
     }
   }
 
-  async updateManage(id: string, payload: ProductPayload) {
-    await this.findProductByIdOrThrow(id);
-    const data: Prisma.ProductUpdateInput = {};
+  async updateVendorProduct(
+    currentUser: AuthTokenPayload,
+    id: string,
+    payload: unknown,
+  ) {
+    const vendor = await this.findActiveVendorForUser(currentUser);
+    const body = this.asPayload(payload);
+    const product = await this.findVendorProductOrThrow(vendor.id, id);
 
-    if (payload.vendorId !== undefined) {
-      const vendorId = this.requiredString(payload.vendorId, 'vendorId');
-      await this.validateVendor(vendorId);
-      data.vendor = { connect: { id: vendorId } };
+    if (product.status === ProductStatus.ARCHIVED) {
+      throw new ConflictException('Archived products cannot be updated');
     }
 
-    if (payload.categoryId !== undefined) {
-      const categoryId = this.requiredString(payload.categoryId, 'categoryId');
+    this.rejectVendorRestrictedFields(body);
+
+    const data: Prisma.ProductUpdateInput = {};
+    let hasContentChange = false;
+
+    if (body.categoryId !== undefined) {
+      const categoryId = this.requiredString(body.categoryId, 'categoryId');
       await this.validateCategory(categoryId);
       data.category = { connect: { id: categoryId } };
+      hasContentChange = true;
     }
 
-    if (payload.name !== undefined) {
-      data.name = this.requiredString(payload.name, 'name');
+    if (body.name !== undefined) {
+      data.name = this.requiredString(body.name, 'name');
+      hasContentChange = true;
     }
 
-    if (payload.slug !== undefined) {
-      data.slug = this.normalizeSlug(payload.slug);
+    if (body.slug !== undefined) {
+      data.slug = this.normalizeSlug(body.slug);
+      hasContentChange = true;
     }
 
-    if (payload.description !== undefined) {
+    if (body.description !== undefined) {
       data.description =
-        this.optionalString(payload.description) ?? 'No description provided.';
+        this.optionalString(body.description, 'description') ??
+        'No description provided.';
+      hasContentChange = true;
     }
 
-    if (payload.price !== undefined) {
-      data.price = this.positiveNumber(payload.price, 'price');
+    if (body.price !== undefined) {
+      data.price = this.positiveNumber(body.price, 'price');
+      hasContentChange = true;
     }
 
-    if (payload.offerPrice !== undefined) {
-      data.offerPrice = this.optionalPositiveNumber(
-        payload.offerPrice,
-        'offerPrice',
-      );
-    }
-
-    if (payload.stockQuantity !== undefined) {
+    if (body.stockQuantity !== undefined) {
       data.stockQuantity = this.nonNegativeInteger(
-        payload.stockQuantity,
+        body.stockQuantity,
         'stockQuantity',
       );
-    }
-
-    if (payload.status !== undefined) {
-      data.status = this.optionalStatus(payload.status, ProductStatus.DRAFT);
-    }
-
-    if (payload.isActive !== undefined) {
-      data.isActive = this.optionalBoolean(payload.isActive, true, 'isActive');
-    }
-
-    if (payload.isFeatured !== undefined) {
-      data.isFeatured = this.optionalBoolean(
-        payload.isFeatured,
-        false,
-        'isFeatured',
-      );
-    }
-
-    if (payload.isOnOffer !== undefined) {
-      data.isOnOffer = this.optionalBoolean(payload.isOnOffer, false, 'isOnOffer');
     }
 
     if (Object.keys(data).length === 0) {
       throw new BadRequestException('At least one field is required');
     }
 
+    if (hasContentChange) {
+      data.status = ProductStatus.PENDING_APPROVAL;
+      data.isActive = true;
+    }
+
     try {
       return await this.prisma.product.update({
-        where: { id },
+        where: { id: product.id },
         data,
         include: this.productIncludes(),
       });
@@ -189,11 +211,62 @@ export class ProductsService {
     }
   }
 
-  async softArchiveManage(id: string) {
-    await this.findProductByIdOrThrow(id);
+  async archiveVendorProduct(currentUser: AuthTokenPayload, id: string) {
+    const vendor = await this.findActiveVendorForUser(currentUser);
+    const product = await this.findVendorProductOrThrow(vendor.id, id);
 
     return this.prisma.product.update({
-      where: { id },
+      where: { id: product.id },
+      data: {
+        isActive: false,
+        status: ProductStatus.ARCHIVED,
+      },
+      include: this.productIncludes(),
+    });
+  }
+
+  async findPendingAdmin() {
+    return this.prisma.product.findMany({
+      where: { status: ProductStatus.PENDING_APPROVAL },
+      include: this.productIncludes(),
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async approveProductAdmin(id: string) {
+    const product = await this.findProductWithRelationsByIdOrThrow(id);
+
+    this.ensureProductCanBePublished(product);
+
+    return this.prisma.product.update({
+      where: { id: product.id },
+      data: {
+        status: ProductStatus.PUBLISHED,
+        isActive: true,
+      },
+      include: this.productIncludes(),
+    });
+  }
+
+  async rejectProductAdmin(id: string) {
+    const product = await this.findProductByIdOrThrow(id);
+
+    if (product.status === ProductStatus.ARCHIVED) {
+      throw new ConflictException('Archived products cannot be rejected');
+    }
+
+    return this.prisma.product.update({
+      where: { id: product.id },
+      data: { status: ProductStatus.REJECTED },
+      include: this.productIncludes(),
+    });
+  }
+
+  async archiveProductAdmin(id: string) {
+    const product = await this.findProductByIdOrThrow(id);
+
+    return this.prisma.product.update({
+      where: { id: product.id },
       data: {
         isActive: false,
         status: ProductStatus.ARCHIVED,
@@ -206,20 +279,85 @@ export class ProductsService {
     return {
       isActive: true,
       status: ProductStatus.PUBLISHED,
-      ...(filter.categorySlug
-        ? { category: { slug: filter.categorySlug, isActive: true } }
-        : {}),
+      category: {
+        isActive: true,
+        ...(filter.categorySlug ? { slug: filter.categorySlug } : {}),
+      },
+      vendor: this.publicVendorWhere(),
+    };
+  }
+
+  private publicVendorWhere(): Prisma.VendorWhereInput {
+    return {
+      isActive: true,
+      status: VendorStatus.APPROVED,
+      user: { isActive: true },
     };
   }
 
   private productIncludes() {
     return {
-      vendor: true,
+      vendor: {
+        select: {
+          id: true,
+          storeName: true,
+          slug: true,
+          description: true,
+          logoUrl: true,
+          status: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
       category: true,
       images: {
         orderBy: { sortOrder: 'asc' as const },
       },
     };
+  }
+
+  private productRelationsInclude() {
+    return {
+      vendor: { include: { user: true } },
+      category: true,
+    };
+  }
+
+  private async findActiveVendorForUser(currentUser: AuthTokenPayload) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: currentUser.sub },
+      include: { vendor: true },
+    });
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User session is no longer valid');
+    }
+
+    if (user.role !== Role.VENDOR || !user.vendor) {
+      throw new ForbiddenException('Vendor role is required');
+    }
+
+    if (
+      !user.vendor.isActive ||
+      user.vendor.status !== VendorStatus.APPROVED
+    ) {
+      throw new ForbiddenException('Active approved vendor profile is required');
+    }
+
+    return user.vendor;
+  }
+
+  private async findVendorProductOrThrow(vendorId: string, id: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, vendorId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return product;
   }
 
   private async findProductByIdOrThrow(id: string) {
@@ -232,13 +370,34 @@ export class ProductsService {
     return product;
   }
 
-  private async validateVendor(vendorId: string) {
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { id: vendorId },
+  private async findProductWithRelationsByIdOrThrow(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: this.productRelationsInclude(),
     });
 
-    if (!vendor) {
-      throw new NotFoundException('Vendor not found');
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return product;
+  }
+
+  private ensureProductCanBePublished(product: ProductWithRelations) {
+    if (product.status === ProductStatus.ARCHIVED) {
+      throw new ConflictException('Archived products cannot be approved');
+    }
+
+    if (!product.category.isActive) {
+      throw new BadRequestException('Product category is inactive');
+    }
+
+    if (
+      !product.vendor.isActive ||
+      product.vendor.status !== VendorStatus.APPROVED ||
+      !product.vendor.user.isActive
+    ) {
+      throw new BadRequestException('Product vendor is not active and approved');
     }
   }
 
@@ -252,6 +411,26 @@ export class ProductsService {
     }
   }
 
+  private rejectVendorRestrictedFields(payload: ProductPayload) {
+    const blockedFields = VENDOR_RESTRICTED_FIELDS.filter((field) =>
+      Object.prototype.hasOwnProperty.call(payload, field),
+    );
+
+    if (blockedFields.length > 0) {
+      throw new BadRequestException(
+        `${blockedFields.join(', ')} cannot be managed by vendors`,
+      );
+    }
+  }
+
+  private asPayload(payload: unknown): ProductPayload {
+    if (!payload || typeof payload !== 'object') {
+      throw new BadRequestException('Request body is required');
+    }
+
+    return payload as ProductPayload;
+  }
+
   private requiredString(value: unknown, field: string) {
     if (typeof value !== 'string' || value.trim().length === 0) {
       throw new BadRequestException(`${field} is required`);
@@ -260,13 +439,13 @@ export class ProductsService {
     return value.trim();
   }
 
-  private optionalString(value: unknown) {
+  private optionalString(value: unknown, field: string) {
     if (value === undefined || value === null) {
       return null;
     }
 
     if (typeof value !== 'string') {
-      throw new BadRequestException('description must be a string');
+      throw new BadRequestException(`${field} must be a string`);
     }
 
     const trimmed = value.trim();
@@ -281,14 +460,6 @@ export class ProductsService {
     }
 
     return parsed;
-  }
-
-  private optionalPositiveNumber(value: unknown, field: string) {
-    if (value === undefined || value === null || value === '') {
-      return null;
-    }
-
-    return this.positiveNumber(value, field);
   }
 
   private nonNegativeInteger(value: unknown, field: string, fallback?: number) {
@@ -322,33 +493,6 @@ export class ProductsService {
     }
 
     return parsed;
-  }
-
-  private optionalBoolean(value: unknown, fallback: boolean, field: string) {
-    if (value === undefined || value === null) {
-      return fallback;
-    }
-
-    if (typeof value !== 'boolean') {
-      throw new BadRequestException(`${field} must be a boolean`);
-    }
-
-    return value;
-  }
-
-  private optionalStatus(value: unknown, fallback: ProductStatus) {
-    if (value === undefined || value === null || value === '') {
-      return fallback;
-    }
-
-    if (
-      typeof value !== 'string' ||
-      !Object.values(ProductStatus).includes(value as ProductStatus)
-    ) {
-      throw new BadRequestException('status is invalid');
-    }
-
-    return value as ProductStatus;
   }
 
   private normalizeSlug(value: unknown, fallbackName?: string) {

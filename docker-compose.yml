@@ -17,6 +17,72 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://marketplace:marketplace@postgres:5432/localmarket?schema=public
+      BACKEND_PORT: 4000
+      JWT_ACCESS_SECRET: localmarket-dev-secret-change-before-production
+      AUTH_COOKIE_SECURE: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://127.0.0.1:4000/api').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  seed:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    profiles:
+      - tools
+    environment:
+      DATABASE_URL: postgresql://marketplace:marketplace@postgres:5432/localmarket?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-c", "npx prisma migrate deploy && npm run prisma:seed"]
+    restart: "no"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: /api
+      INTERNAL_API_URL: http://backend:4000/api
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://127.0.0.1:3000').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
 volumes:
   postgres_data:
-

@@ -58,10 +58,6 @@ function VendorOverview({ vendor }: { vendor: Vendor }) {
     };
   }, []);
 
-  const pendingOrders = useMemo(
-    () => orders.filter((order) => order.status === "PENDING").length,
-    [orders],
-  );
   const openOrders = useMemo(
     () =>
       orders.filter(
@@ -70,6 +66,17 @@ function VendorOverview({ vendor }: { vendor: Vendor }) {
     [orders],
   );
   const recentOrders = orders.slice(0, 3);
+  const deliveredOrders = useMemo(
+    () => orders.filter((order) => order.status === "DELIVERED").length,
+    [orders],
+  );
+  const deliveredRevenue = useMemo(
+    () =>
+      orders
+        .filter((order) => order.status === "DELIVERED")
+        .reduce((sum, order) => sum + Number(order.total), 0),
+    [orders],
+  );
 
   return (
     <div className="space-y-6">
@@ -92,13 +99,38 @@ function VendorOverview({ vendor }: { vendor: Vendor }) {
         </Link>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard label="Received orders" value={`${orders.length}`} />
-        <MetricCard label="Open orders" value={`${openOrders}`} />
-        <MetricCard label="Pending confirmation" value={`${pendingOrders}`} />
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Orders today" value={isLoading ? "--" : formatTnd(0)} />
+        <MetricCard label="Orders this week" value={isLoading ? "--" : formatTnd(0)} />
+        <MetricCard
+          label="Orders this month"
+          value={isLoading ? "--" : formatTnd(deliveredRevenue)}
+          note={`${deliveredOrders} delivered`}
+        />
+        <MetricCard
+          highlight
+          label="Total revenue"
+          value={isLoading ? "--" : formatTnd(orders.reduce((sum, order) => sum + Number(order.total), 0))}
+          note={`${orders.length} order${orders.length === 1 ? "" : "s"}`}
+        />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <Card className="border-slate-200/90">
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-2xl font-bold text-slate-950">Order tracking</h3>
+            <div className="flex flex-wrap items-center gap-4 text-sm font-semibold text-slate-600">
+              <span>Delivered {orders.length ? Math.round((deliveredOrders / orders.length) * 100) : 0}%</span>
+              <span>Returned 0%</span>
+            </div>
+          </div>
+          <div className="rounded-full bg-market-100 px-4 py-4 text-center text-xl font-bold text-market-800">
+            {isLoading ? "Loading..." : orders.length === 0 ? "No data available" : `${openOrders} open orders in progress`}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-4">
@@ -135,13 +167,22 @@ function VendorOverview({ vendor }: { vendor: Vendor }) {
 
         <Card>
           <CardContent className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-950">Quick links</h3>
-            <div className="space-y-2">
-              <QuickLink href="/vendor/orders" label="Review received orders" />
-              <QuickLink href="/" label="View marketplace" />
+            <h3 className="text-2xl font-bold text-slate-950">Orders traffic</h3>
+            <div className="flex min-h-64 items-center justify-center rounded-xl border border-slate-200 bg-white">
+              <div className="relative h-44 w-44 rounded-full border-[28px] border-market-700 border-r-market-300">
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <p className="text-sm text-slate-500">Total</p>
+                  <p className="text-4xl font-bold text-slate-950">{orders.length}</p>
+                </div>
+              </div>
             </div>
-            <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-              Call the buyer before shipping when address or phone details look unclear.
+            <div className="grid grid-cols-2 gap-2 text-center text-sm font-semibold text-slate-700">
+              <p className="rounded-lg border border-market-200 bg-market-50 px-2 py-2">
+                {orders.length ? Math.round((openOrders / orders.length) * 100) : 0}% Open
+              </p>
+              <p className="rounded-lg border border-market-200 bg-market-100 px-2 py-2">
+                {orders.length ? Math.round((deliveredOrders / orders.length) * 100) : 0}% Delivered
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -150,12 +191,31 @@ function VendorOverview({ vendor }: { vendor: Vendor }) {
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function MetricCard({
+  highlight,
+  label,
+  note,
+  value,
+}: {
+  highlight?: boolean;
+  label: string;
+  note?: string;
+  value: string;
+}) {
   return (
-    <Card className="bg-white/95">
+    <Card
+      className={
+        highlight
+          ? "border-market-700 bg-gradient-to-br from-market-800 to-market-700 text-white"
+          : "bg-white/95"
+      }
+    >
       <CardContent className="space-y-1.5">
-        <p className="text-sm text-slate-500">{label}</p>
-        <p className="text-2xl font-bold leading-none text-slate-950">{value}</p>
+        <p className={highlight ? "text-sm text-market-100" : "text-sm text-slate-500"}>{label}</p>
+        <p className={highlight ? "text-4xl font-bold leading-none text-white" : "text-4xl font-bold leading-none text-slate-950"}>
+          {value}
+        </p>
+        {note ? <p className={highlight ? "text-sm text-market-100" : "text-sm text-slate-500"}>{note}</p> : null}
       </CardContent>
     </Card>
   );
@@ -174,17 +234,6 @@ function RecentOrderRow({ order }: { order: Order }) {
       </div>
       <p className="font-bold text-slate-950">{formatTnd(order.total)}</p>
     </div>
-  );
-}
-
-function QuickLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      className="flex h-10 items-center rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
-      href={href}
-    >
-      {label}
-    </Link>
   );
 }
 

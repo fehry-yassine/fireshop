@@ -5,7 +5,17 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CartItem, Prisma, Product, ProductImage, ProductStatus, Vendor } from '@prisma/client';
+import {
+  CartItem,
+  Category,
+  Prisma,
+  Product,
+  ProductImage,
+  ProductStatus,
+  User,
+  Vendor,
+  VendorStatus,
+} from '@prisma/client';
 import { AuthTokenPayload } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -16,8 +26,9 @@ type CartPayload = {
 
 type CartItemWithProduct = CartItem & {
   product: Product & {
-    vendor: Vendor;
+    category: Category;
     images: ProductImage[];
+    vendor: Vendor & { user: User };
   };
 };
 
@@ -142,8 +153,9 @@ export class CartService {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
       include: {
-        vendor: true,
+        category: true,
         images: { orderBy: { sortOrder: 'asc' } },
+        vendor: { include: { user: true } },
       },
     });
 
@@ -155,10 +167,26 @@ export class CartService {
   }
 
   private ensureProductAvailable(
-    product: Product & { vendor: Vendor; images: ProductImage[] },
+    product: Product & {
+      category: Category;
+      images: ProductImage[];
+      vendor: Vendor & { user: User };
+    },
   ) {
     if (!product.isActive || product.status !== ProductStatus.PUBLISHED) {
       throw new BadRequestException('Product is not available for cart');
+    }
+
+    if (!product.category.isActive) {
+      throw new BadRequestException('Product category is not available');
+    }
+
+    if (
+      !product.vendor.isActive ||
+      product.vendor.status !== VendorStatus.APPROVED ||
+      !product.vendor.user.isActive
+    ) {
+      throw new BadRequestException('Product vendor is not available');
     }
 
     return product;
@@ -204,8 +232,9 @@ export class CartService {
     return {
       product: {
         include: {
-          vendor: true,
+          category: true,
           images: { orderBy: { sortOrder: 'asc' as const } },
+          vendor: { include: { user: true } },
         },
       },
     };

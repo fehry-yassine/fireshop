@@ -21,7 +21,6 @@ enum VendorStatus {
 }
 
 enum ProductStatus {
-  DRAFT
   PENDING_APPROVAL
   PUBLISHED
   REJECTED
@@ -110,7 +109,7 @@ model Product {
   price         Decimal        @db.Decimal(10, 2)
   offerPrice    Decimal?       @db.Decimal(10, 2)
   stockQuantity Int            @default(0)
-  status        ProductStatus  @default(DRAFT)
+  status        ProductStatus  @default(PENDING_APPROVAL)
   isActive      Boolean        @default(true)
   isFeatured    Boolean        @default(false)
   isOnOffer     Boolean        @default(false)

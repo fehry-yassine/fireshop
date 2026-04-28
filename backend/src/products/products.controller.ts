@@ -1,4 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Role } from '@prisma/client';
+import { AuthTokenPayload } from '../auth/auth.types';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { ProductsService } from './products.service';
 
 @Controller('products')
@@ -14,22 +20,41 @@ export class ProductsController {
   findBySlug(@Param('slug') slug: string) {
     return this.productsService.findBySlugPublic(slug);
   }
+}
 
-  // TODO: Protect this route with a vendor/admin guard when auth is implemented.
+@Controller('vendor/products')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.VENDOR)
+export class VendorProductsController {
+  constructor(private readonly productsService: ProductsService) {}
+
+  @Get()
+  findMyProducts(@CurrentUser() currentUser: AuthTokenPayload) {
+    return this.productsService.findVendorProducts(currentUser);
+  }
+
   @Post()
-  createProduct(@Body() body: unknown) {
-    return this.productsService.createManage(body ?? {});
+  createProduct(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Body() body: unknown,
+  ) {
+    return this.productsService.createVendorProduct(currentUser, body ?? {});
   }
 
-  // TODO: Protect this route with a vendor/admin guard when auth is implemented.
   @Patch(':id')
-  updateProduct(@Param('id') id: string, @Body() body: unknown) {
-    return this.productsService.updateManage(id, body ?? {});
+  updateProduct(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.productsService.updateVendorProduct(currentUser, id, body ?? {});
   }
 
-  // TODO: Protect this route with a vendor/admin guard when auth is implemented.
-  @Delete(':id')
-  deleteProduct(@Param('id') id: string) {
-    return this.productsService.softArchiveManage(id);
+  @Patch(':id/archive')
+  archiveProduct(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+  ) {
+    return this.productsService.archiveVendorProduct(currentUser, id);
   }
 }
