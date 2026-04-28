@@ -1,7 +1,9 @@
+name: fireshop
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: localmarket-postgres
+    container_name: fireshop-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: marketplace
