@@ -40,7 +40,7 @@ export function LoginForm() {
       <CardContent className="space-y-6">
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-slate-950">Sign in</h1>
-          <p className="text-sm text-slate-500">Access your LocalMarket account.</p>
+          <p className="text-sm text-slate-500">Access your FireShop account.</p>
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
@@ -76,7 +76,7 @@ export function LoginForm() {
         </form>
 
         <p className="text-sm text-slate-600">
-          New to LocalMarket?{" "}
+          New to FireShop?{" "}
           <Link className="font-semibold text-market-700 hover:text-market-600" href="/auth/register">
             Create account
           </Link>
@@ -85,3 +85,4 @@ export function LoginForm() {
     </Card>
   );
 }
+

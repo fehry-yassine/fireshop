@@ -163,7 +163,7 @@ export function CartPageClient() {
             <div className="space-y-2">
               <h1 className="text-2xl font-bold text-slate-950">Your cart is empty</h1>
               <p className="text-sm leading-6 text-slate-500">
-                Products you add from LocalMarket vendors will appear here.
+                Products you add from FireShop vendors will appear here.
               </p>
             </div>
             <Link
@@ -366,7 +366,7 @@ function CartSummary({ cart }: { cart: CartResponse }) {
           </Link>
 
           <p className="text-xs leading-5 text-slate-500">
-            LocalMarket supports one-vendor COD checkout in this version.
+            FireShop supports one-vendor COD checkout in this version.
           </p>
         </CardContent>
       </Card>
@@ -393,3 +393,4 @@ function CartLoadingState({ label }: { label: string }) {
     </Card>
   );
 }
+

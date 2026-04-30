@@ -10,12 +10,12 @@ const config: Config = {
     extend: {
       colors: {
         market: {
-          50: "#fff4eb",
-          100: "#ffe6d3",
-          200: "#ffc8a3",
-          300: "#efb66f",
-          500: "#ff8137",
-          600: "#ff672d",
+          50: "#fff7f1",
+          100: "#ffebdc",
+          200: "#ffd2b2",
+          300: "#f2b56a",
+          500: "#ff8a38",
+          600: "#ff6a2d",
           700: "#ff552f",
           800: "#e64a29",
           900: "#c43f24",

@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const product = await getProduct(slug);
 
   return {
-    title: `${product.name} | LocalMarket`,
+    title: `${product.name} | FireShop`,
     description: product.description,
   };
 }
@@ -157,3 +157,4 @@ function getStockLabel(product: Product) {
 
   return "In stock";
 }
+

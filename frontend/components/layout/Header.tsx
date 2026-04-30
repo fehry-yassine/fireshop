@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { AuthNav } from "@/components/auth/AuthNav";
 import { Button } from "@/components/ui/Button";
@@ -11,10 +12,16 @@ export function Header() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-5">
           <div className="flex items-center justify-between gap-4">
             <Link
-              className="rounded-md text-xl font-bold tracking-normal text-slate-950 outline-none transition-colors hover:text-market-700 focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2"
+              className="flex items-center gap-2 rounded-md outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2"
               href="/"
             >
-              LocalMarket
+              <Image
+                alt="FireShop"
+                className="h-9 w-auto object-contain"
+                height={48}
+                src="/branding/fireshop-mark.png"
+                width={160}
+              />
             </Link>
           </div>
 
@@ -34,6 +41,13 @@ export function Header() {
               Search
             </Button>
           </form>
+
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-market-300 bg-market-50 px-4 text-sm font-semibold text-market-800 transition hover:border-market-500 hover:bg-market-100"
+            href="/search"
+          >
+            Search
+          </Link>
 
           <AuthNav />
         </div>

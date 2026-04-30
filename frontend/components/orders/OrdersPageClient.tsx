@@ -93,7 +93,7 @@ export function OrdersPageClient() {
             <div className="space-y-2">
               <h1 className="text-2xl font-bold text-slate-950">No orders yet</h1>
               <p className="text-sm leading-6 text-slate-500">
-                Your cash-on-delivery orders from LocalMarket vendors will appear here.
+                Your cash-on-delivery orders from FireShop vendors will appear here.
               </p>
             </div>
             <Link
@@ -115,7 +115,7 @@ export function OrdersPageClient() {
           <p className="text-sm font-semibold text-market-700">Buyer account</p>
           <h1 className="text-2xl font-bold text-slate-950 sm:text-3xl">Orders</h1>
           <p className="max-w-2xl text-sm leading-6 text-slate-600">
-            Track your LocalMarket COD orders and check their vendor status.
+            Track your FireShop COD orders and check their vendor status.
           </p>
         </div>
         <Link
@@ -223,3 +223,4 @@ function formatDateTime(value: string) {
     timeStyle: "short",
   }).format(date);
 }
+

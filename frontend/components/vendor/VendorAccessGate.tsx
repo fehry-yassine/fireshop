@@ -134,10 +134,10 @@ export function VendorAccessGate({ children }: VendorAccessGateProps) {
 
   if (message || !vendor) {
     return (
-      <Card>
+      <Card className="mx-auto mt-12 max-w-xl border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
         <CardContent className="space-y-4 py-10 text-center">
-          <h1 className="text-2xl font-bold text-slate-950">Vendor profile unavailable</h1>
-          <p className="text-sm text-red-700">
+          <h1 className="text-2xl font-bold text-white">Vendor profile unavailable</h1>
+          <p className="text-sm text-red-300">
             {message ?? "Your active vendor profile could not be found."}
           </p>
         </CardContent>
@@ -245,7 +245,7 @@ function BuyerVendorGuidance({
               Apply to become a vendor
             </h1>
             <p className="text-sm leading-6 text-slate-500">
-              Seller tools are available after your LocalMarket vendor profile is
+              Seller tools are available after your FireShop vendor profile is
               approved. Product management will come later; this area is for received
               COD orders.
             </p>
@@ -372,10 +372,10 @@ function AdminVendorGuidance() {
 
 function VendorLoadingState({ label }: { label: string }) {
   return (
-    <Card>
+    <Card className="mx-auto mt-12 max-w-xl border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
       <CardContent className="py-10 text-center">
-        <p className="text-sm font-semibold text-slate-950">{label}</p>
-        <p className="mt-2 text-sm text-slate-500">Please wait a moment.</p>
+        <p className="text-sm font-semibold text-white">{label}</p>
+        <p className="mt-2 text-sm text-[#98A0B2]">Please wait a moment.</p>
       </CardContent>
     </Card>
   );
@@ -416,3 +416,4 @@ function getVendorApplicationError(error: unknown) {
 
   return "Could not submit vendor application.";
 }
+

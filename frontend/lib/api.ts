@@ -4,9 +4,12 @@ import type {
   Order,
   OrderStatus,
   Product,
+  ProductRecommendationResponse,
   PublicUser,
+  RecommendationLocale,
   Vendor,
   VendorApplication,
+  VendorProductPayload,
 } from "@/types";
 
 const SERVER_API_URL =
@@ -171,6 +174,28 @@ export const products = {
   getBySlug: (slug: string) => request<Product>(`/products/${slug}`),
 };
 
+export const search = {
+  recommend: (payload: {
+    needText: string;
+    locale?: RecommendationLocale;
+    maxResults?: number;
+  }) =>
+    request<ProductRecommendationResponse>("/products/recommend", {
+      method: "POST",
+      body: payload,
+    }),
+  feedback: (payload: {
+    query: string;
+    productId: string;
+    action: "view" | "click" | "add_to_cart";
+  }) =>
+    request<{ ok: boolean }>("/products/recommend/feedback", {
+      method: "POST",
+      body: payload,
+      timeoutMs: 3000,
+    }),
+};
+
 export const vendors = {
   list: () => request<Vendor[]>("/vendors"),
   getBySlug: (slug: string) => request<Vendor>(`/vendors/${slug}`),
@@ -188,6 +213,23 @@ export const vendors = {
       method: "PATCH",
       body: { status },
   }),
+  products: {
+    list: () => request<Product[]>("/vendor/products"),
+    create: (payload: VendorProductPayload) =>
+      request<Product>("/vendor/products", {
+        method: "POST",
+        body: payload,
+      }),
+    update: (id: string, payload: Partial<VendorProductPayload>) =>
+      request<Product>(`/vendor/products/${id}`, {
+        method: "PATCH",
+        body: payload,
+      }),
+    archive: (id: string) =>
+      request<Product>(`/vendor/products/${id}/archive`, {
+        method: "PATCH",
+      }),
+  },
 };
 
 type CategoryPayload = {
@@ -288,5 +330,6 @@ export const api = {
   categories,
   orders,
   products,
+  search,
   vendors,
 };

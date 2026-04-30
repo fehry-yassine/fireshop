@@ -75,9 +75,9 @@ export default async function HomePage() {
           <nav className="flex items-center gap-5 overflow-x-auto text-lg font-bold text-slate-900">
             <a
               className="whitespace-nowrap border-b-2 border-market-700 pb-2 text-market-800"
-              href="/"
+              href="/search"
             >
-              AI Mode
+              Recherche
             </a>
             <a className="whitespace-nowrap pb-2 hover:text-market-800" href="#produits">
               Produits
@@ -120,6 +120,12 @@ export default async function HomePage() {
                 />
                 Recherche par image
               </label>
+              <a
+                className="inline-flex h-10 items-center rounded-lg border border-market-300 px-4 text-sm font-semibold text-market-800 hover:bg-market-50"
+                href="/search"
+              >
+                Ouvrir la recherche
+              </a>
             </form>
           </div>
         </Container>
@@ -232,7 +238,7 @@ export default async function HomePage() {
             <div>
               <h2 className="text-2xl font-bold text-slate-950">Meilleures offres</h2>
               <p className="text-sm text-slate-500">
-                Trouvez les meilleurs prix sur LocalMarket.
+                Trouvez les meilleurs prix sur FireShop.
               </p>
             </div>
             <a className="text-sm font-semibold text-slate-700 hover:text-market-800" href="/orders">
@@ -331,3 +337,4 @@ export default async function HomePage() {
     </main>
   );
 }
+

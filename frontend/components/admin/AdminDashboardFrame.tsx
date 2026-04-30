@@ -17,10 +17,11 @@ const adminLinks = [
 export function AdminDashboardFrame({ children }: AdminDashboardFrameProps) {
   return (
     <BackofficeFrame
+      brand="fireshop"
       links={adminLinks}
       panelLabel="Admin Panel"
       panelSubtitle="Marketplace Operations"
-      panelTitle="LocalMarket"
+      panelTitle="FireShop"
       supportText="Moderate vendors, monitor orders, and keep catalog data clean."
       topBadgeLabel="Admin Workspace"
       topTitle="Admin Dashboard"

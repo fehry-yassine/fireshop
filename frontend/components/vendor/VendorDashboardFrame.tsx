@@ -12,16 +12,19 @@ type VendorDashboardFrameProps = {
 const vendorLinks = [
   { href: "/vendor", label: "Dashboard" },
   { href: "/vendor/orders", label: "Orders" },
+  { href: "/vendor/products", label: "Products" },
+  { href: "/vendor/settings", label: "Store Settings", badge: "Soon", disabled: true },
 ];
 
 export function VendorDashboardFrame({ children, vendor }: VendorDashboardFrameProps) {
   return (
     <BackofficeFrame
+      brand="fireshop"
       links={vendorLinks}
       panelLabel="Seller Panel"
       panelSubtitle={vendor.slug}
       panelTitle={vendor.storeName}
-      supportText="Manage COD orders, keep response times fast, and update order statuses frequently."
+      supportText="Manage products, stock, and received COD orders from one focused seller workspace."
       topBadgeLabel="Vendor Workspace"
       topTitle="Vendor Dashboard"
     >

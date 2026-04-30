@@ -66,7 +66,7 @@ export type Product = {
   price: MoneyValue;
   offerPrice?: MoneyValue | null;
   stockQuantity: number;
-  status: "DRAFT" | "PENDING_APPROVAL" | "PUBLISHED" | "REJECTED" | "ARCHIVED";
+  status: "PENDING_APPROVAL" | "PUBLISHED" | "REJECTED" | "ARCHIVED";
   isActive: boolean;
   isFeatured: boolean;
   isOnOffer: boolean;
@@ -75,6 +75,46 @@ export type Product = {
   images?: ProductImage[];
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type VendorProductPayload = {
+  categoryId: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  price: MoneyValue;
+  stockQuantity: number;
+  imageUrls?: string[];
+};
+
+export type RecommendationLocale = "auto" | "en" | "fr" | "ar_tn";
+
+export type RecommendationSummary = {
+  title: string;
+  userNeedUnderstanding: string;
+  strategyJustification: string;
+  matchNarrative: string;
+};
+
+export type ProductRecommendation = {
+  product: Product;
+  score: number;
+  reasons: string[];
+  matchedTerms: string[];
+};
+
+export type ProductRecommendationResponse = {
+  query: string;
+  normalizedQuery: string;
+  locale: Exclude<RecommendationLocale, "auto">;
+  parsedBudget: {
+    min?: number;
+    max?: number;
+    currency: "TND";
+  } | null;
+  summary: RecommendationSummary;
+  keywordsUsed: string[];
+  results: ProductRecommendation[];
 };
 
 export type CartItem = {

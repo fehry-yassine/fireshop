@@ -136,7 +136,7 @@ export function CheckoutPageClient() {
             <div className="space-y-2">
               <h1 className="text-2xl font-bold text-slate-950">Nothing to checkout</h1>
               <p className="text-sm leading-6 text-slate-500">
-                Add products from a LocalMarket vendor before starting COD checkout.
+                Add products from a FireShop vendor before starting COD checkout.
               </p>
             </div>
             <Link
@@ -393,3 +393,4 @@ function getCheckoutErrorMessage(error: unknown) {
 
   return "Could not create your order. Please try again.";
 }
+

@@ -20,6 +20,16 @@ export class ProductsController {
   findBySlug(@Param('slug') slug: string) {
     return this.productsService.findBySlugPublic(slug);
   }
+
+  @Post('recommend')
+  recommend(@Body() body: unknown) {
+    return this.productsService.recommendProducts(body ?? {});
+  }
+
+  @Post('recommend/feedback')
+  feedback(@Body() body: unknown) {
+    return this.productsService.recordRecommendationFeedback(body ?? {});
+  }
 }
 
 @Controller('vendor/products')

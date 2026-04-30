@@ -124,37 +124,37 @@ function VendorOrdersContent({ vendor }: { vendor: Vendor }) {
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-market-700">{vendor.storeName}</p>
-          <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl">
+          <p className="text-sm font-semibold text-[#E64A29]">{vendor.storeName}</p>
+          <h2 className="text-2xl font-bold text-white sm:text-3xl">
             Received orders
           </h2>
-          <p className="max-w-2xl text-sm leading-6 text-slate-600">
+          <p className="max-w-2xl text-sm leading-6 text-[#98A0B2]">
             Confirm, prepare, ship, or cancel COD orders from buyers.
           </p>
         </div>
-        <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+        <div className="rounded-xl border border-[#3D2D22] bg-[#261C16] px-3 py-2 text-sm font-semibold text-[#FF9B5D]">
           {openOrders.length} open
         </div>
       </div>
 
       {isLoading ? (
-        <Card>
+        <Card className="border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
           <CardContent className="py-10 text-center">
-            <p className="text-sm font-semibold text-slate-950">Loading received orders</p>
-            <p className="mt-2 text-sm text-slate-500">Please wait a moment.</p>
+            <p className="text-sm font-semibold text-white">Loading received orders</p>
+            <p className="mt-2 text-sm text-[#98A0B2]">Please wait a moment.</p>
           </CardContent>
         </Card>
       ) : orders.length === 0 ? (
-        <Card>
+        <Card className="border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
           <CardContent className="space-y-5 py-10 text-center">
             <div className="space-y-2">
-              <h3 className="text-2xl font-bold text-slate-950">No received orders yet</h3>
-              <p className="text-sm leading-6 text-slate-500">
+              <h3 className="text-2xl font-bold text-white">No received orders yet</h3>
+              <p className="text-sm leading-6 text-[#98A0B2]">
                 Buyer COD orders for your store will appear here when checkout is complete.
               </p>
             </div>
             <Link
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-[#2A2E39] bg-[#171B23] px-4 text-sm font-semibold text-[#D5D9E1] transition-colors hover:border-[#353A48] hover:bg-[#1D212B]"
               href="/vendor"
             >
               Back to overview
@@ -167,8 +167,8 @@ function VendorOrdersContent({ vendor }: { vendor: Vendor }) {
             <p
               className={
                 message.tone === "success"
-                  ? "rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700"
-                  : "rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
+                  ? "rounded-lg border border-emerald-900/35 bg-emerald-950/20 px-3 py-2 text-sm font-medium text-emerald-300"
+                  : "rounded-lg border border-red-900/35 bg-red-950/20 px-3 py-2 text-sm font-medium text-red-300"
               }
             >
               {message.text}
@@ -214,43 +214,43 @@ function VendorOrderCard({
   const statusChanged = selectedStatus !== order.status;
 
   return (
-    <Card>
+    <Card className="border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
       <CardContent className="space-y-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <OrderStatusBadge status={order.status} />
-              <span className="text-xs font-medium text-slate-500">
+              <span className="text-xs font-medium text-[#8F97A8]">
                 {formatDateTime(order.createdAt)}
               </span>
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-950">Order {shortOrderId(order.id)}</h3>
-              <p className="break-all text-xs text-slate-500">{order.id}</p>
+              <h3 className="text-lg font-bold text-white">Order {shortOrderId(order.id)}</h3>
+              <p className="break-all text-xs text-[#8F97A8]">{order.id}</p>
             </div>
           </div>
 
           <div className="text-left xl:text-right">
-            <p className="text-sm text-slate-500">Total</p>
-            <p className="text-xl font-bold text-slate-950">{formatTnd(order.total)}</p>
+            <p className="text-sm text-[#8F97A8]">Total</p>
+            <p className="text-xl font-bold text-white">{formatTnd(order.total)}</p>
           </div>
         </div>
 
-        <div className="grid gap-3 border-y border-slate-200 py-4 text-sm md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 border-y border-[#262B37] py-4 text-sm md:grid-cols-2 xl:grid-cols-4">
           <OrderFact label="Customer" value={order.shipping.fullName} />
           <OrderFact label="Phone" value={order.shipping.phone} />
           <OrderFact label="City" value={order.shipping.city} />
           <OrderFact label="Items" value={itemCount === 1 ? "1 item" : `${itemCount} items`} />
         </div>
 
-        <div className="rounded-lg bg-slate-50 p-3 text-sm">
-          <p className="font-semibold text-slate-950">Delivery address</p>
-          <p className="mt-1 text-slate-600">{formatAddress(order)}</p>
+        <div className="rounded-xl border border-[#2A2E39] bg-[#171B23] p-3 text-sm">
+          <p className="font-semibold text-white">Delivery address</p>
+          <p className="mt-1 text-[#9CA4B5]">{formatAddress(order)}</p>
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-slate-950">Order items</p>
-          <div className="divide-y divide-slate-200 rounded-lg border border-slate-200">
+          <p className="text-sm font-semibold text-white">Order items</p>
+          <div className="divide-y divide-[#262B37] rounded-xl border border-[#262B37]">
             {order.items.map((item) => (
               <div
                 className="grid gap-2 p-3 text-sm sm:grid-cols-[minmax(0,1fr)_80px_120px] sm:items-center"
@@ -258,15 +258,15 @@ function VendorOrderCard({
               >
                 <div className="min-w-0">
                   <Link
-                    className="font-semibold text-slate-950 hover:text-market-700"
+                    className="font-semibold text-[#E8EBF2] hover:text-[#FF8E4C]"
                     href={`/product/${item.productSlug}`}
                   >
                     {item.productName}
                   </Link>
-                  <p className="break-all text-xs text-slate-500">{item.productSlug}</p>
+                  <p className="break-all text-xs text-[#8F97A8]">{item.productSlug}</p>
                 </div>
-                <p className="font-semibold text-slate-950">Qty {item.quantity}</p>
-                <p className="font-semibold text-slate-950 sm:text-right">
+                <p className="font-semibold text-[#E8EBF2]">Qty {item.quantity}</p>
+                <p className="font-semibold text-[#E8EBF2] sm:text-right">
                   {formatTnd(item.subtotal)}
                 </p>
               </div>
@@ -274,13 +274,13 @@ function VendorOrderCard({
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div className="grid gap-3 rounded-xl border border-[#262B37] bg-[#171B23] p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700" htmlFor={`status-${order.id}`}>
+            <label className="text-sm font-semibold text-[#C3C9D6]" htmlFor={`status-${order.id}`}>
               Update status
             </label>
             <select
-              className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
+              className="h-10 w-full rounded-lg border border-[#2A2E39] bg-[#11141B] px-3 text-sm font-medium text-[#EEF0F4] outline-none transition focus:border-[#FF6A2D] focus:ring-2 focus:ring-[#FF6A2D]/20"
               id={`status-${order.id}`}
               onChange={(event) => onStatusChange(event.target.value as OrderStatus)}
               value={selectedStatus}
@@ -292,7 +292,11 @@ function VendorOrderCard({
               ))}
             </select>
           </div>
-          <Button disabled={isUpdating || !statusChanged} onClick={onUpdateStatus}>
+          <Button
+            className="bg-gradient-to-r from-[#FF6A2D] to-[#FF8F40] hover:from-[#FF7A3B] hover:to-[#FF9D56] focus-visible:ring-[#FF6A2D]/30"
+            disabled={isUpdating || !statusChanged}
+            onClick={onUpdateStatus}
+          >
             {isUpdating ? "Updating" : "Update"}
           </Button>
         </div>
@@ -301,8 +305,8 @@ function VendorOrderCard({
           <p
             className={
               message.tone === "success"
-                ? "rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700"
-                : "rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
+                ? "rounded-lg border border-emerald-900/35 bg-emerald-950/20 px-3 py-2 text-sm font-medium text-emerald-300"
+                : "rounded-lg border border-red-900/35 bg-red-950/20 px-3 py-2 text-sm font-medium text-red-300"
             }
           >
             {message.text}
@@ -316,8 +320,8 @@ function VendorOrderCard({
 function OrderFact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-slate-500">{label}</p>
-      <p className="break-words font-semibold text-slate-950">{value}</p>
+      <p className="text-[#8F97A8]">{label}</p>
+      <p className="break-words font-semibold text-[#E8EBF2]">{value}</p>
     </div>
   );
 }
@@ -360,3 +364,4 @@ function formatDateTime(value: string) {
     timeStyle: "short",
   }).format(date);
 }
+
