@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@prisma/client';
 import { AuthTokenPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -6,6 +18,13 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProductsService } from './products.service';
+
+type UploadedImageFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
 
 @Controller('products')
 export class ProductsController {
@@ -49,6 +68,23 @@ export class VendorProductsController {
     @Body() body: unknown,
   ) {
     return this.productsService.createVendorProduct(currentUser, body ?? {});
+  }
+
+  @Post('upload-image')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadProductImage(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @UploadedFile() file: UploadedImageFile,
+  ) {
+    return this.productsService.uploadVendorProductImage(currentUser, file);
+  }
+
+  @Patch(':id/publish')
+  publishProduct(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+  ) {
+    return this.productsService.publishVendorProduct(currentUser, id);
   }
 
   @Patch(':id')

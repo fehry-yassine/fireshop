@@ -217,7 +217,7 @@ export class CartService {
 
     if (existingItem && existingItem.product.vendorId !== vendorId) {
       throw new ConflictException(
-        'Cart can only contain products from one vendor',
+        'Single-vendor checkout only. Please order from one vendor at a time.',
       );
     }
   }

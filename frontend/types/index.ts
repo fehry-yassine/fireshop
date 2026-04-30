@@ -66,7 +66,14 @@ export type Product = {
   price: MoneyValue;
   offerPrice?: MoneyValue | null;
   stockQuantity: number;
-  status: "PENDING_APPROVAL" | "PUBLISHED" | "REJECTED" | "ARCHIVED";
+  status:
+    | "DRAFT"
+    | "PENDING_REVIEW"
+    | "APPROVED"
+    | "PUBLISHED"
+    | "REJECTED"
+    | "ARCHIVED";
+  rejectionReason?: string | null;
   isActive: boolean;
   isFeatured: boolean;
   isOnOffer: boolean;
@@ -75,6 +82,75 @@ export type Product = {
   images?: ProductImage[];
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type AdminProductListItem = {
+  id: string;
+  image?: string | null;
+  name: string;
+  title?: string;
+  slug: string;
+  price: MoneyValue;
+  stock: number;
+  status: Product["status"];
+  vendorName: string;
+  categoryName: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminProductListResponse = {
+  items: AdminProductListItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  stats: {
+    pendingReview: number;
+    published: number;
+    rejected: number;
+    archived: number;
+  };
+};
+
+export type AdminProductDetails = {
+  id: string;
+  name: string;
+  title?: string;
+  slug: string;
+  description: string;
+  status: Product["status"];
+  price: MoneyValue;
+  offerPrice?: MoneyValue | null;
+  stock: number;
+  isActive: boolean;
+  isFeatured: boolean;
+  isOnOffer: boolean;
+  rejectionReason?: string | null;
+  images: ProductImage[];
+  vendor: {
+    id: string;
+    storeName: string;
+    slug: string;
+    status: VendorStatus;
+    isActive: boolean;
+    owner: {
+      id: string;
+      fullName: string;
+      email: string;
+      isActive: boolean;
+    };
+  };
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    isActive: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type VendorProductPayload = {
@@ -137,9 +213,9 @@ export type CartResponse = {
 export type OrderStatus =
   | "PENDING"
   | "CONFIRMED"
-  | "PREPARING"
   | "SHIPPED"
   | "DELIVERED"
+  | "RETURNED"
   | "CANCELLED";
 
 export type Order = {
@@ -160,6 +236,7 @@ export type Order = {
   deliveryFee: number;
   total: number;
   notes?: string | null;
+  vendorDeletedAt?: string | null;
   buyer: PublicUser;
   vendor: Pick<Vendor, "id" | "storeName" | "slug">;
   items: Array<{
@@ -167,10 +244,41 @@ export type Order = {
     productId: string;
     productName: string;
     productSlug: string;
+    productImage?: ProductImage | null;
     unitPrice: number;
     quantity: number;
     subtotal: number;
   }>;
   createdAt: string;
   updatedAt: string;
+};
+
+export type VendorDashboardStats = {
+  ordersToday: number;
+  ordersThisWeek: number;
+  ordersThisMonth: number;
+  totalOrders: number;
+  deliveredOrders: number;
+  returnedOrders: number;
+  openOrders: number;
+  revenue?: number;
+  expectedRevenue?: number;
+  totalRevenue: number;
+  revenueStatuses: OrderStatus[];
+  expectedRevenueStatuses?: OrderStatus[];
+  openOrderStatuses?: OrderStatus[];
+  recentOrders: Order[];
+};
+
+export type VendorOrderUpsertPayload = {
+  status?: OrderStatus;
+  fullName: string;
+  phone: string;
+  address: string;
+  city: string;
+  governorate?: string;
+  postalCode?: string;
+  notes?: string;
+  productId?: string;
+  quantity?: number;
 };

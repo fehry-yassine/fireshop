@@ -3,6 +3,12 @@ import { api } from "@/lib/api";
 import { formatTnd } from "@/lib/format";
 import type { Category, Product } from "@/types";
 
+type HomePageProps = {
+  searchParams?: Promise<{
+    category?: string | string[];
+  }>;
+};
+
 const heroImages = [
   "https://images.unsplash.com/photo-1542291026-7eec264c27ff",
   "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9",
@@ -24,10 +30,10 @@ const promoImage =
 const quickCustomImage =
   "https://images.unsplash.com/photo-1612196808214-b8e1d6145a05";
 
-async function getHomeData() {
+async function getHomeData(categorySlug?: string) {
   const [categoriesResult, productsResult] = await Promise.allSettled([
     api.categories.tree(),
-    api.products.list(),
+    api.products.list(categorySlug ? { category: categorySlug } : undefined),
   ]);
 
   return {
@@ -52,8 +58,13 @@ function seededIndex(seed: string, length: number) {
   );
 }
 
-export default async function HomePage() {
-  const { categories, products } = await getHomeData();
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const params = await searchParams;
+  const rawCategory = Array.isArray(params?.category)
+    ? params?.category[0]
+    : params?.category;
+  const categorySlug = rawCategory && rawCategory !== "all" ? rawCategory : undefined;
+  const { categories, products } = await getHomeData(categorySlug);
   const featuredProducts = products.slice(0, 4);
   const bestOffers = products.slice(0, 6);
   const rankedProducts = products.slice(0, 4);

@@ -24,7 +24,7 @@ type ProductFormMessage = {
   tone: "success" | "error";
 };
 
-type ProductAvailability = "SHOWN" | "HIDDEN" | "OUT_OF_STOCK";
+type SubmitIntent = "save" | "publish";
 
 type VendorProductFormProps = {
   categories: Category[];
@@ -37,13 +37,14 @@ type VendorProductFormProps = {
 const emptyDraft: ProductFormDraft = {
   categoryId: "",
   description: "",
-  imageUrls: [""],
+  imageUrls: [],
   name: "",
   price: "",
   stockQuantity: "0",
 };
 
 const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGES = 6;
 
 export function VendorProductForm({
   categories,
@@ -56,15 +57,16 @@ export function VendorProductForm({
   const [draft, setDraft] = useState<ProductFormDraft>(
     product ? toDraft(product) : emptyDraft,
   );
-  const [availability, setAvailability] = useState<ProductAvailability>(
-    deriveAvailability(product),
-  );
   const [message, setMessage] = useState<ProductFormMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitIntent, setSubmitIntent] = useState<SubmitIntent>(
+    mode === "create" ? "publish" : "save",
+  );
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   useEffect(() => {
     setDraft(product ? toDraft(product) : emptyDraft);
-    setAvailability(deriveAvailability(product));
+    setSubmitIntent(mode === "create" ? "publish" : "save");
     setMessage(null);
   }, [mode, product?.id]);
 
@@ -72,49 +74,58 @@ export function VendorProductForm({
     () => draft.imageUrls.map((url) => url.trim()).filter(Boolean),
     [draft.imageUrls],
   );
+
+  const statusForDisplay = product?.status ?? "DRAFT";
   const title = mode === "create" ? "Create a product" : product?.name ?? "Edit product";
-  const submitLabel = isSubmitting ? "Saving" : "Save";
-  const showVisibilityTodo = availability === "HIDDEN";
-  const isSaveDisabled = !isDraftValid(draft, availability) || isSubmitting;
+  const canPublishFromEdit =
+    mode === "edit" && (product?.status === "DRAFT" || product?.status === "REJECTED");
+  const isSaveDisabled = !isDraftValid(draft) || isSubmitting || isUploadingImages;
 
-  async function importImageAt(index: number, file: File) {
-    if (!file.type.startsWith("image/")) {
+  async function uploadImages(files: FileList | File[]) {
+    const selectedFiles = Array.from(files);
+
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    if (draft.imageUrls.length + selectedFiles.length > MAX_IMAGES) {
       setMessage({
-        text: "Please select a valid image file.",
+        text: `You can upload up to ${MAX_IMAGES} images per product.`,
         tone: "error",
       });
       return;
     }
 
-    if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
-      setMessage({
-        text: "Image is too large. Please use an image smaller than 5MB.",
-        tone: "error",
-      });
-      return;
-    }
+    setIsUploadingImages(true);
+    setMessage(null);
 
     try {
-      const dataUrl = await readImageFileAsDataUrl(file);
-      setDraft((current) => {
-        const nextImageUrls = [...current.imageUrls];
+      const uploadedUrls: string[] = [];
 
-        while (nextImageUrls.length <= index) {
-          nextImageUrls.push("");
+      for (const file of selectedFiles) {
+        if (!file.type.startsWith("image/")) {
+          throw new Error("Please select image files only.");
         }
 
-        nextImageUrls[index] = dataUrl;
-        return {
-          ...current,
-          imageUrls: nextImageUrls,
-        };
-      });
-      setMessage(null);
-    } catch {
+        if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
+          throw new Error("Image is too large. Please upload a smaller image.");
+        }
+
+        const response = await api.vendors.products.uploadImage(file);
+        uploadedUrls.push(response.url);
+      }
+
+      setDraft((current) => ({
+        ...current,
+        imageUrls: [...current.imageUrls, ...uploadedUrls],
+      }));
+    } catch (error) {
       setMessage({
-        text: "Could not import image from your computer.",
+        text: getImageUploadError(error),
         tone: "error",
       });
+    } finally {
+      setIsUploadingImages(false);
     }
   }
 
@@ -129,19 +140,19 @@ export function VendorProductForm({
     setMessage(null);
 
     try {
-      const nextDraft =
-        availability === "OUT_OF_STOCK"
-          ? { ...draft, stockQuantity: "0" }
-          : draft;
-      const payload = toPayload(nextDraft);
+      const payload = toPayload(draft);
+      const intent = submitIntent;
 
       if (mode === "create") {
-        await api.vendors.products.create(payload);
-        await onSaved(
-          showVisibilityTodo
-            ? "Product created. Hidden visibility needs backend support."
-            : "Product created.",
-        );
+        const createdProduct = await api.vendors.products.create(payload);
+
+        if (intent === "publish") {
+          await api.vendors.products.publish(createdProduct.id);
+          await onSaved("Product submitted for admin review");
+          return;
+        }
+
+        await onSaved("Product saved as draft.");
         return;
       }
 
@@ -149,14 +160,15 @@ export function VendorProductForm({
         throw new Error("Product is missing.");
       }
 
-      await api.vendors.products.update(product.id, payload);
+      const updatedProduct = await api.vendors.products.update(product.id, payload);
 
-      // TODO: Persist Hidden visibility when the backend exposes a vendor visibility field.
-      await onSaved(
-        showVisibilityTodo
-          ? "Product updated. Hidden visibility is simulated until backend support is added."
-          : "Product updated.",
-      );
+      if (intent === "publish" && canPublishFromEdit) {
+        await api.vendors.products.publish(updatedProduct.id);
+        await onSaved("Product submitted for admin review");
+        return;
+      }
+
+      await onSaved("Product updated.");
     } catch (error) {
       setMessage({
         text: getProductFormError(error, "Could not save product."),
@@ -167,224 +179,181 @@ export function VendorProductForm({
     }
   }
 
+  const saveLabel = mode === "create" ? "Save as draft" : "Save changes";
+  const publishLabel = mode === "create" ? "Publish" : "Publish for review";
+
   return (
-    <div className="flex min-h-full flex-col bg-[#0F1218]">
-      <div className="sticky top-0 z-20 border-b border-[#242833] bg-[#11141B] px-4 py-4 shadow-lg shadow-black/35 sm:px-5">
+    <div className="vendor-editor flex h-full min-h-0 flex-col">
+      <div className="vendor-topbar sticky top-0 z-20 border-b px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <button
               aria-label="Close product editor"
-              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#2A2E39] bg-[#171B23] text-lg font-bold text-[#A5ADBE] transition-colors hover:border-[#4B3628] hover:bg-[#241A14] hover:text-[#FF9B5D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A2D]/30"
+              className="vendor-icon-button mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-lg font-bold transition-colors focus-visible:outline-none focus-visible:ring-2"
               onClick={onCancel}
               type="button"
             >
               x
             </button>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-normal text-[#8E96A8]">
+              <p className="vendor-muted text-xs font-semibold uppercase tracking-normal">
                 Product editor
               </p>
-              <h2 className="truncate text-xl font-bold text-white">{title}</h2>
+              <h2 className="vendor-title truncate text-xl font-bold">{title}</h2>
               {mode === "edit" && product ? (
-                <p className="mt-1 truncate text-xs text-[#8E96A8]">{product.slug}</p>
+                <p className="vendor-muted mt-1 truncate text-xs">{product.slug}</p>
               ) : null}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              aria-label="Product visibility"
-              className="h-10 rounded-lg border border-[#2A2E39] bg-[#171B23] px-3 text-sm font-bold text-[#EEF0F4] outline-none transition focus:border-[#FF6A2D] focus:ring-2 focus:ring-[#FF6A2D]/20"
-              onChange={(event) =>
-                setAvailability(event.target.value as ProductAvailability)
-              }
-              value={availability}
-            >
-              <option value="SHOWN">Shown</option>
-              <option value="HIDDEN">Hidden</option>
-              <option value="OUT_OF_STOCK">Out of stock</option>
-            </select>
+            <ProductStatusBadge status={statusForDisplay} />
             <Button
-              className="h-10 bg-gradient-to-r from-[#FF6A2D] to-[#FF8F40] px-5 shadow-lg shadow-orange-950/35 hover:from-[#FF7A3B] hover:to-[#FF9D56] focus-visible:ring-[#FF6A2D]/30"
+              className="vendor-secondary-action h-10 px-4"
               disabled={isSaveDisabled}
               form={formId}
+              onClick={() => setSubmitIntent("save")}
               type="submit"
+              variant="secondary"
             >
-              {submitLabel}
+              {isSubmitting && submitIntent === "save" ? "Saving" : saveLabel}
             </Button>
+            {mode === "create" || canPublishFromEdit ? (
+              <Button
+                className="vendor-primary-action h-10 px-5"
+                disabled={isSaveDisabled}
+                form={formId}
+                onClick={() => setSubmitIntent("publish")}
+                type="submit"
+              >
+                {isSubmitting && submitIntent === "publish" ? "Publishing" : publishLabel}
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 p-4 sm:p-5">
-        {message ? <InlineMessage message={message} /> : null}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5">
+        <div className="space-y-4">
+          {message ? <InlineMessage message={message} /> : null}
 
-        {showVisibilityTodo ? (
-          <div className="rounded-lg border border-[#3D2D22] bg-[#261C16] px-4 py-3 text-sm leading-6 text-[#FFB07E]">
-            Hidden is a visibility state, not archive. The backend does not persist
-            vendor visibility yet, so this is simulated in the editor for now.
-          </div>
-        ) : null}
-
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <form className="space-y-4" id={formId} onSubmit={handleSubmit}>
-            <Card className="overflow-hidden border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
-              <SectionHeader eyebrow="Details" title="Product identity" />
-              <CardContent className="space-y-5">
-                <ImageUrlEditor
-                  imageUrls={draft.imageUrls}
-                  onAdd={() =>
-                    setDraft((current) => ({
-                      ...current,
-                      imageUrls: [...current.imageUrls, ""],
-                    }))
-                  }
-                  onChange={(index, value) =>
-                    setDraft((current) => ({
-                      ...current,
-                      imageUrls: current.imageUrls.map((url, currentIndex) =>
-                        currentIndex === index ? value : url,
-                      ),
-                    }))
-                  }
-                  onImport={(index, file) => {
-                    void importImageAt(index, file);
-                  }}
-                  onRemove={(index) =>
-                    setDraft((current) => ({
-                      ...current,
-                      imageUrls:
-                        current.imageUrls.length === 1
-                          ? [""]
-                          : current.imageUrls.filter((_, currentIndex) => currentIndex !== index),
-                    }))
-                  }
-                  previewUrls={imagePreviewUrls}
-                />
-
-                <Field label="Product title" name="name">
-                  <Input
-                    className="border-[#2A2E39] bg-[#171B23] text-[#EEF0F4] placeholder:text-[#737B8D] focus:border-[#FF6A2D] focus:ring-[#FF6A2D]/20"
-                    id="name"
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, name: event.target.value }))
-                    }
-                    placeholder="Product title"
-                    required
-                    value={draft.name}
-                  />
-                </Field>
-
-                <Field label="Category" name="categoryId">
-                  <select
-                    className="h-10 w-full rounded-lg border border-[#2A2E39] bg-[#171B23] px-3 text-sm text-[#EEF0F4] outline-none transition focus:border-[#FF6A2D] focus:ring-2 focus:ring-[#FF6A2D]/20"
-                    id="categoryId"
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, categoryId: event.target.value }))
-                    }
-                    required
-                    value={draft.categoryId}
-                  >
-                    <option value="">Select category</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
-              <SectionHeader eyebrow="Pricing" title="Selling price" />
-              <CardContent className="space-y-4">
-                <Field label="Price" name="price">
-                  <Input
-                    className="border-[#2A2E39] bg-[#171B23] text-[#EEF0F4] placeholder:text-[#737B8D] focus:border-[#FF6A2D] focus:ring-[#FF6A2D]/20"
-                    id="price"
-                    min="0.001"
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, price: event.target.value }))
-                    }
-                    placeholder="0.000"
-                    required
-                    step="0.001"
-                    type="number"
-                    value={draft.price}
-                  />
-                </Field>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
-              <SectionHeader eyebrow="Inventory" title="Stock quantity" />
-              <CardContent className="space-y-4">
-                <Field label="Stock quantity" name="stockQuantity">
-                  <Input
-                    className="border-[#2A2E39] bg-[#171B23] text-[#EEF0F4] placeholder:text-[#737B8D] focus:border-[#FF6A2D] focus:ring-[#FF6A2D]/20"
-                    disabled={availability === "OUT_OF_STOCK"}
-                    id="stockQuantity"
-                    min={0}
-                    onChange={(event) =>
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+            <form className="space-y-4" id={formId} onSubmit={handleSubmit}>
+              <Card className="vendor-card overflow-hidden">
+                <SectionHeader eyebrow="Details" title="Product identity" />
+                <CardContent className="space-y-5">
+                  <ImagePickerEditor
+                    imageUrls={draft.imageUrls}
+                    isUploading={isUploadingImages}
+                    onAddFiles={(files) => {
+                      void uploadImages(files);
+                    }}
+                    onRemove={(index) =>
                       setDraft((current) => ({
                         ...current,
-                        stockQuantity: event.target.value,
+                        imageUrls: current.imageUrls.filter((_, currentIndex) => currentIndex !== index),
                       }))
                     }
-                    required
-                    type="number"
-                    value={availability === "OUT_OF_STOCK" ? "0" : draft.stockQuantity}
                   />
-                </Field>
-                <div className="rounded-lg border border-[#2A2E39] bg-[#171B23] px-4 py-3 text-sm leading-6 text-[#98A0B2]">
-                  Out of stock keeps the product record visible but saves stock as 0.
-                  Archive remains a separate catalog action.
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card className="overflow-hidden border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
-              <SectionHeader eyebrow="Description" title="Buyer-facing content" />
-              <CardContent>
-                <textarea
-                  className="min-h-44 w-full resize-y rounded-lg border border-[#2A2E39] bg-[#171B23] px-3 py-3 text-sm leading-6 text-[#EEF0F4] outline-none transition placeholder:text-[#737B8D] focus:border-[#FF6A2D] focus:ring-2 focus:ring-[#FF6A2D]/20"
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, description: event.target.value }))
-                  }
-                  placeholder="Write a clear buyer-facing product description."
-                  value={draft.description}
-                />
-              </CardContent>
-            </Card>
-          </form>
+                  <Field label="Product title" name="name">
+                    <Input
+                      className="vendor-input"
+                      id="name"
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, name: event.target.value }))
+                      }
+                      placeholder="Product title"
+                      required
+                      value={draft.name}
+                    />
+                  </Field>
 
-          <ProductPreviewCard
-            availability={availability}
-            draft={draft}
-            imageUrl={imagePreviewUrls[0]}
-            productStatus={product?.status}
-          />
-        </div>
-      </div>
+                  <Field label="Category" name="categoryId">
+                    <select
+                      className="vendor-select h-10 w-full rounded-lg px-3 text-sm outline-none transition focus:ring-2"
+                      id="categoryId"
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, categoryId: event.target.value }))
+                      }
+                      required
+                      value={draft.categoryId}
+                    >
+                      <option value="">Select category</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </CardContent>
+              </Card>
 
-      <div className="sticky bottom-0 border-t border-[#242833] bg-[#11141B] px-4 py-3 shadow-[0_-10px_30px_rgba(0,0,0,0.45)] sm:px-5">
-        <div className="flex items-center justify-between gap-3">
-          <Button
-            className="border-[#2A2E39] bg-[#171B23] text-[#D2D7E0] hover:border-[#353A48] hover:bg-[#1D212B]"
-            onClick={onCancel}
-            variant="secondary"
-          >
-            Cancel
-          </Button>
-          <Button
-            className="bg-gradient-to-r from-[#FF6A2D] to-[#FF8F40] hover:from-[#FF7A3B] hover:to-[#FF9D56] focus-visible:ring-[#FF6A2D]/30"
-            disabled={isSaveDisabled}
-            form={formId}
-            type="submit"
-          >
-            {submitLabel}
-          </Button>
+              <Card className="vendor-card overflow-hidden">
+                <SectionHeader eyebrow="Pricing" title="Selling price" />
+                <CardContent className="space-y-4">
+                  <Field label="Price" name="price">
+                    <Input
+                      className="vendor-input"
+                      id="price"
+                      min="0.001"
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, price: event.target.value }))
+                      }
+                      placeholder="0.000"
+                      required
+                      step="0.001"
+                      type="number"
+                      value={draft.price}
+                    />
+                  </Field>
+                </CardContent>
+              </Card>
+
+              <Card className="vendor-card overflow-hidden">
+                <SectionHeader eyebrow="Inventory" title="Stock quantity" />
+                <CardContent className="space-y-4">
+                  <Field label="Stock quantity" name="stockQuantity">
+                    <Input
+                      className="vendor-input"
+                      id="stockQuantity"
+                      min={0}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          stockQuantity: event.target.value,
+                        }))
+                      }
+                      required
+                      type="number"
+                      value={draft.stockQuantity}
+                    />
+                  </Field>
+                </CardContent>
+              </Card>
+
+              <Card className="vendor-card overflow-hidden">
+                <SectionHeader eyebrow="Description" title="Buyer-facing content" />
+                <CardContent>
+                  <textarea
+                    className="vendor-input min-h-44 w-full resize-y rounded-lg px-3 py-3 text-sm leading-6 outline-none transition focus:ring-2"
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, description: event.target.value }))
+                    }
+                    placeholder="Write a clear buyer-facing product description."
+                    value={draft.description}
+                  />
+                </CardContent>
+              </Card>
+            </form>
+
+            <ProductPreviewCard
+              draft={draft}
+              imageUrl={imagePreviewUrls[0]}
+              productStatus={statusForDisplay}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -393,131 +362,116 @@ export function VendorProductForm({
 
 function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
-    <div className="border-b border-[#242833] px-4 py-4 text-white sm:px-5">
-      <p className="text-xs font-semibold uppercase tracking-normal text-[#FF9B5D]">
+    <div className="vendor-divider border-b px-4 py-4 sm:px-5">
+      <p className="vendor-accent-text text-xs font-semibold uppercase tracking-normal">
         {eyebrow}
       </p>
-      <h3 className="mt-1 text-lg font-bold">{title}</h3>
+      <h3 className="vendor-title mt-1 text-lg font-bold">{title}</h3>
     </div>
   );
 }
 
-function ImageUrlEditor({
+function ImagePickerEditor({
   imageUrls,
-  onAdd,
-  onChange,
-  onImport,
+  isUploading,
+  onAddFiles,
   onRemove,
-  previewUrls,
 }: {
   imageUrls: string[];
-  onAdd: () => void;
-  onChange: (index: number, value: string) => void;
-  onImport: (index: number, file: File) => void;
+  isUploading: boolean;
+  onAddFiles: (files: FileList) => void;
   onRemove: (index: number) => void;
-  previewUrls: string[];
 }) {
-  const primaryPreview = previewUrls[0];
   const filePickerRef = useRef<HTMLInputElement | null>(null);
-  const [targetIndex, setTargetIndex] = useState<number>(0);
 
-  function openFilePicker(index: number) {
-    setTargetIndex(index);
+  function openFilePicker() {
     filePickerRef.current?.click();
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
+    const files = event.target.files;
+
+    if (!files || files.length === 0) {
       return;
     }
 
-    onImport(targetIndex, file);
+    onAddFiles(files);
     event.target.value = "";
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <label className="text-sm font-bold text-[#E8EBF2]" htmlFor="imageUrl-0">
-          Images
-        </label>
+        <p className="vendor-title text-sm font-bold">Images</p>
         <Button
-          className="h-9 border-[#4B3628] bg-[#241A14] px-3 text-xs text-[#FF9B5D] hover:border-[#664735] hover:bg-[#2B1F17]"
-          onClick={onAdd}
+          className="vendor-secondary-action h-9 px-3 text-xs"
+          disabled={isUploading || imageUrls.length >= MAX_IMAGES}
+          onClick={openFilePicker}
+          type="button"
           variant="secondary"
         >
-          Add photo slot
+          {isUploading ? "Uploading" : "Add photo"}
         </Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[150px_minmax(0,1fr)]">
-        <div className="space-y-2">
-          <button
-            className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-[#4B3628] bg-[#241A14] transition hover:bg-[#2E2119] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A2D]/30"
-            onClick={() => openFilePicker(0)}
-            type="button"
-          >
-            {primaryPreview ? (
-              <img
-                alt="Primary product preview"
-                className="h-full w-full object-cover"
-                src={primaryPreview}
-              />
-            ) : (
-              <span className="text-center text-xs font-bold text-[#FF9B5D]">
-                Import photo
-                <br />
-                800 x 800
-              </span>
-            )}
-          </button>
-          {previewUrls.length > 1 ? (
-            <div className="grid grid-cols-3 gap-2">
-              {previewUrls.slice(1, 4).map((url) => (
-                <div
-                  className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-[#2A2E39] bg-[#171B23]"
-                  key={url}
-                >
-                  <img alt="Product preview" className="h-full w-full object-cover" src={url} />
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
+      <button
+        className="vendor-upload-zone flex aspect-square w-full max-w-[170px] items-center justify-center overflow-hidden rounded-lg border border-dashed transition focus-visible:outline-none focus-visible:ring-2"
+        disabled={isUploading}
+        onClick={openFilePicker}
+        type="button"
+      >
+        {imageUrls[0] ? (
+          <img
+            alt="Primary product preview"
+            className="h-full w-full object-cover"
+            src={imageUrls[0]}
+          />
+        ) : (
+          <span className="vendor-accent-text px-2 text-center text-xs font-bold">
+            Click to add photos
+            <br />
+            PNG JPG WEBP GIF
+          </span>
+        )}
+      </button>
 
-        <div className="space-y-2">
+      {imageUrls.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {imageUrls.map((url, index) => (
-            <div className="flex gap-2" key={index}>
-              <Input
-                className="border-[#2A2E39] bg-[#171B23] text-[#EEF0F4] placeholder:text-[#737B8D] focus:border-[#FF6A2D] focus:ring-[#FF6A2D]/20"
-                id={`imageUrl-${index}`}
-                onChange={(event) => onChange(index, event.target.value)}
-                placeholder="https://example.com/product-image.jpg or imported image"
-                value={url}
-              />
+            <div
+              className="vendor-image-cell relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border"
+              key={`${url}-${index}`}
+            >
+              <img alt={`Product preview ${index + 1}`} className="h-full w-full object-cover" src={url} />
               <button
-                className="h-10 rounded-lg border border-[#4B3628] bg-[#241A14] px-3 text-xs font-bold text-[#FF9B5D] transition-colors hover:border-[#664735] hover:bg-[#2B1F17] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A2D]/30"
-                onClick={() => openFilePicker(index)}
-                type="button"
-              >
-                Import
-              </button>
-              <button
-                aria-label={`Remove image URL ${index + 1}`}
-                className="h-10 rounded-lg border border-[#2A2E39] bg-[#171B23] px-3 text-xs font-bold text-[#9FA6B7] transition-colors hover:border-red-900/40 hover:bg-red-950/20 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A2D]/30"
+                aria-label={`Remove image ${index + 1}`}
+                className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/75 text-xs font-bold text-white transition hover:bg-slate-950"
                 onClick={() => onRemove(index)}
                 type="button"
               >
-                Remove
+                x
               </button>
             </div>
           ))}
+          {imageUrls.length < MAX_IMAGES ? (
+            <button
+              className="vendor-upload-zone flex aspect-square items-center justify-center rounded-lg border border-dashed text-xs font-bold"
+              disabled={isUploading}
+              onClick={openFilePicker}
+              type="button"
+            >
+              + Add photo
+            </button>
+          ) : null}
         </div>
-      </div>
+      ) : null}
+
+      <p className="text-xs text-slate-500">Up to {MAX_IMAGES} images, max 5MB each.</p>
+
       <input
         accept="image/*"
         className="hidden"
+        multiple
         onChange={handleFileChange}
         ref={filePickerRef}
         type="file"
@@ -527,46 +481,41 @@ function ImageUrlEditor({
 }
 
 function ProductPreviewCard({
-  availability,
   draft,
   imageUrl,
   productStatus,
 }: {
-  availability: ProductAvailability;
   draft: ProductFormDraft;
   imageUrl?: string;
-  productStatus?: Product["status"];
+  productStatus: Product["status"];
 }) {
   return (
     <aside className="space-y-3 xl:sticky xl:top-28 xl:self-start">
-      <p className="text-xs font-semibold uppercase tracking-normal text-[#8E96A8]">
+      <p className="vendor-muted text-xs font-semibold uppercase tracking-normal">
         Live preview
       </p>
-      <Card className="overflow-hidden border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
-        <div className="flex aspect-square items-center justify-center bg-[#241A14]">
+      <Card className="vendor-card overflow-hidden">
+        <div className="vendor-upload-zone flex aspect-square items-center justify-center">
           {imageUrl ? (
             <img alt="Product preview" className="h-full w-full object-cover" src={imageUrl} />
           ) : (
-            <span className="text-sm font-bold text-[#FF9B5D]">Product image</span>
+            <span className="vendor-accent-text text-sm font-bold">Product image</span>
           )}
         </div>
         <CardContent className="space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="line-clamp-2 font-bold text-white">
+              <p className="vendor-title line-clamp-2 font-bold">
                 {draft.name.trim() || "Product title"}
               </p>
-              <p className="mt-1 text-sm font-bold text-[#FF6A2D]">
+              <p className="vendor-accent-text mt-1 text-sm font-bold">
                 {formatTnd(draft.price)}
               </p>
             </div>
-            <AvailabilityBadge availability={availability} status={productStatus} />
+            <ProductStatusBadge status={productStatus} />
           </div>
-          <div className="rounded-lg border border-[#2A2E39] bg-[#171B23] px-3 py-2 text-sm text-[#9CA4B5]">
-            Stock:{" "}
-            <span className="font-bold text-[#EEF0F4]">
-              {availability === "OUT_OF_STOCK" ? "0" : draft.stockQuantity || "0"}
-            </span>
+          <div className="vendor-panel-inset rounded-lg border px-3 py-2 text-sm">
+            Stock: <span className="vendor-title font-bold">{draft.stockQuantity || "0"}</span>
           </div>
         </CardContent>
       </Card>
@@ -585,7 +534,7 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-bold text-[#E8EBF2]" htmlFor={name}>
+      <label className="vendor-title text-sm font-bold" htmlFor={name}>
         {label}
       </label>
       {children}
@@ -598,8 +547,8 @@ function InlineMessage({ message }: { message: ProductFormMessage }) {
     <p
       className={
         message.tone === "success"
-          ? "rounded-lg border border-emerald-900/35 bg-emerald-950/20 px-3 py-2 text-sm font-medium text-emerald-300"
-          : "rounded-lg border border-red-900/35 bg-red-950/20 px-3 py-2 text-sm font-medium text-red-300"
+          ? "vendor-alert-success rounded-lg px-3 py-2 text-sm font-medium"
+          : "vendor-alert-error rounded-lg px-3 py-2 text-sm font-medium"
       }
     >
       {message.text}
@@ -608,65 +557,55 @@ function InlineMessage({ message }: { message: ProductFormMessage }) {
 }
 
 function ProductStatusBadge({ status }: { status?: Product["status"] }) {
+  if (status === "DRAFT") {
+    return (
+      <Badge className="vendor-status-neutral" tone="neutral">
+        Draft
+      </Badge>
+    );
+  }
+
   if (status === "PUBLISHED") {
     return (
-      <Badge className="border-emerald-900/30 bg-emerald-950/20 text-emerald-300" tone="neutral">
+      <Badge className="vendor-status-success" tone="neutral">
         Published
       </Badge>
     );
   }
 
-  if (status === "PENDING_APPROVAL") {
+  if (status === "PENDING_REVIEW") {
     return (
-      <Badge className="border-[#3D2D22] bg-[#261C16] text-[#FF9B5D]" tone="neutral">
-        Pending
+      <Badge className="vendor-status-warning" tone="neutral">
+        Pending review
+      </Badge>
+    );
+  }
+
+  if (status === "APPROVED") {
+    return (
+      <Badge className="bg-blue-50 text-blue-700" tone="neutral">
+        Approved
       </Badge>
     );
   }
 
   if (status === "REJECTED") {
     return (
-      <Badge className="border-red-900/35 bg-red-950/20 text-red-300" tone="neutral">
+      <Badge className="vendor-status-danger" tone="neutral">
         Rejected
       </Badge>
     );
   }
 
   if (status === "ARCHIVED") {
-    return <Badge className="border-[#2A2E39] bg-[#181C24] text-[#A6ADBD]">Archived</Badge>;
+    return <Badge className="vendor-status-neutral">Archived</Badge>;
   }
 
   return (
-    <Badge className="border-[#3D2D22] bg-[#261C16] text-[#FF9B5D]" tone="neutral">
-      Pending approval
+    <Badge className="vendor-status-neutral" tone="neutral">
+      Draft
     </Badge>
   );
-}
-
-function AvailabilityBadge({
-  availability,
-  status,
-}: {
-  availability: ProductAvailability;
-  status?: Product["status"];
-}) {
-  if (availability === "HIDDEN") {
-    return (
-      <Badge className="border-[#2A2E39] bg-[#181C24] text-[#A6ADBD]" tone="neutral">
-        Hidden
-      </Badge>
-    );
-  }
-
-  if (availability === "OUT_OF_STOCK") {
-    return (
-      <Badge className="border-red-900/35 bg-red-950/20 text-red-300" tone="neutral">
-        Out
-      </Badge>
-    );
-  }
-
-  return <ProductStatusBadge status={status} />;
 }
 
 function toDraft(product: Product): ProductFormDraft {
@@ -675,7 +614,7 @@ function toDraft(product: Product): ProductFormDraft {
   return {
     categoryId: product.categoryId,
     description: product.description,
-    imageUrls: imageUrls.length > 0 ? imageUrls : [""],
+    imageUrls,
     name: product.name,
     price: String(product.price),
     stockQuantity: String(product.stockQuantity),
@@ -693,37 +632,9 @@ function toPayload(draft: ProductFormDraft): VendorProductPayload {
   };
 }
 
-function readImageFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-        return;
-      }
-
-      reject(new Error("Invalid file payload"));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
-    reader.readAsDataURL(file);
-  });
-}
-
-function deriveAvailability(product?: Product | null): ProductAvailability {
-  if (!product) {
-    return "SHOWN";
-  }
-
-  if (product.stockQuantity <= 0) {
-    return "OUT_OF_STOCK";
-  }
-
-  return "SHOWN";
-}
-
-function isDraftValid(draft: ProductFormDraft, availability: ProductAvailability) {
+function isDraftValid(draft: ProductFormDraft) {
   const price = Number(draft.price);
-  const stock = availability === "OUT_OF_STOCK" ? 0 : Number(draft.stockQuantity);
+  const stock = Number(draft.stockQuantity);
 
   return (
     draft.name.trim().length > 0 &&
@@ -733,6 +644,27 @@ function isDraftValid(draft: ProductFormDraft, availability: ProductAvailability
     Number.isFinite(stock) &&
     stock >= 0
   );
+}
+
+function getImageUploadError(error: unknown) {
+  if (error instanceof ApiError) {
+    const text = error.message.toLowerCase();
+    if (error.status === 413 || text.includes("too large") || text.includes("file too large")) {
+      return "Image is too large. Please upload a smaller image.";
+    }
+
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    if (error.message.toLowerCase().includes("too large")) {
+      return "Image is too large. Please upload a smaller image.";
+    }
+
+    return error.message;
+  }
+
+  return "Could not upload image.";
 }
 
 function getProductFormError(error: unknown, fallback: string) {
@@ -746,5 +678,3 @@ function getProductFormError(error: unknown, fallback: string) {
 
   return fallback;
 }
-
-

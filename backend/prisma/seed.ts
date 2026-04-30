@@ -288,7 +288,7 @@ async function seedProducts() {
         description: 'Pending moderation sample for admin product approval testing.',
         price: money(320),
         stockQuantity: 15,
-        status: ProductStatus.PENDING_APPROVAL,
+        status: ProductStatus.DRAFT,
         isActive: true,
       },
       {

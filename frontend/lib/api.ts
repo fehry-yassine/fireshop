@@ -1,4 +1,6 @@
 import type {
+  AdminProductDetails,
+  AdminProductListResponse,
   CartResponse,
   Category,
   Order,
@@ -9,6 +11,8 @@ import type {
   RecommendationLocale,
   Vendor,
   VendorApplication,
+  VendorDashboardStats,
+  VendorOrderUpsertPayload,
   VendorProductPayload,
 } from "@/types";
 
@@ -207,7 +211,23 @@ export const vendors = {
       method: "POST",
       body: payload,
     }),
-  orders: () => request<Order[]>("/vendors/orders"),
+  dashboard: () => request<VendorDashboardStats>("/vendors/dashboard"),
+  orders: (query?: { deleted?: boolean; search?: string; status?: OrderStatus }) =>
+    request<Order[]>("/vendors/orders", { query }),
+  createOrder: (payload: VendorOrderUpsertPayload) =>
+    request<{ order: Order }>("/vendors/orders", {
+      method: "POST",
+      body: payload,
+    }),
+  deleteOrder: (id: string) =>
+    request<{ order: Order }>(`/vendors/orders/${id}`, {
+      method: "DELETE",
+    }),
+  updateOrder: (id: string, payload: VendorOrderUpsertPayload) =>
+    request<{ order: Order }>(`/vendors/orders/${id}`, {
+      method: "PATCH",
+      body: payload,
+    }),
   updateOrderStatus: (id: string, status: OrderStatus) =>
     request<{ order: Order }>(`/vendors/orders/${id}/status`, {
       method: "PATCH",
@@ -215,6 +235,16 @@ export const vendors = {
   }),
   products: {
     list: () => request<Product[]>("/vendor/products"),
+    uploadImage: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      return request<{ url: string }>("/vendor/products/upload-image", {
+        method: "POST",
+        body: formData,
+        timeoutMs: 20000,
+      });
+    },
     create: (payload: VendorProductPayload) =>
       request<Product>("/vendor/products", {
         method: "POST",
@@ -224,6 +254,10 @@ export const vendors = {
       request<Product>(`/vendor/products/${id}`, {
         method: "PATCH",
         body: payload,
+      }),
+    publish: (id: string) =>
+      request<Product>(`/vendor/products/${id}/publish`, {
+        method: "PATCH",
       }),
     archive: (id: string) =>
       request<Product>(`/vendor/products/${id}/archive`, {
@@ -273,6 +307,41 @@ export const orders = {
 };
 
 export const admin = {
+  products: {
+    list: (query?: {
+      status?: Product["status"] | "ALL";
+      vendorId?: string;
+      search?: string;
+      category?: string;
+      page?: number;
+      limit?: number;
+    }) =>
+      request<AdminProductListResponse>("/admin/products", {
+        query:
+          query?.status === "ALL"
+            ? { ...query, status: undefined }
+            : query,
+      }),
+    getById: (id: string) => request<AdminProductDetails>(`/admin/products/${id}`),
+    approve: (id: string) =>
+      request<Product>(`/admin/products/${id}/approve`, {
+        method: "PATCH",
+      }),
+    reject: (id: string, payload: { reason: string }) =>
+      request<Product>(`/admin/products/${id}/reject`, {
+        method: "PATCH",
+        body: payload,
+      }),
+    archive: (id: string) =>
+      request<Product>(`/admin/products/${id}/archive`, {
+        method: "PATCH",
+      }),
+    feature: (id: string, featured: boolean) =>
+      request<Product>(`/admin/products/${id}/feature`, {
+        method: "PATCH",
+        body: { featured },
+      }),
+  },
   vendors: {
     applications: (query?: { status?: string }) =>
       request<VendorApplication[]>("/admin/vendors/applications", { query }),

@@ -69,9 +69,33 @@ export class AdminController {
     return this.vendorsService.updateAdmin(id, body ?? {});
   }
 
+  @Get('products')
+  findProducts(
+    @Query('status') status?: string,
+    @Query('vendorId') vendorId?: string,
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.productsService.findAllAdmin({
+      status,
+      vendorId,
+      search,
+      category,
+      page,
+      limit,
+    });
+  }
+
   @Get('products/pending')
   findPendingProducts() {
     return this.productsService.findPendingAdmin();
+  }
+
+  @Get('products/:id')
+  findProductById(@Param('id') id: string) {
+    return this.productsService.findByIdAdmin(id);
   }
 
   @Patch('products/:id/approve')
@@ -80,13 +104,18 @@ export class AdminController {
   }
 
   @Patch('products/:id/reject')
-  rejectProduct(@Param('id') id: string) {
-    return this.productsService.rejectProductAdmin(id);
+  rejectProduct(@Param('id') id: string, @Body() body: unknown) {
+    return this.productsService.rejectProductAdmin(id, body ?? {});
   }
 
   @Patch('products/:id/archive')
   archiveProduct(@Param('id') id: string) {
     return this.productsService.archiveProductAdmin(id);
+  }
+
+  @Patch('products/:id/feature')
+  featureProduct(@Param('id') id: string, @Body() body: unknown) {
+    return this.productsService.featureProductAdmin(id, body ?? {});
   }
 
   @Get('orders')

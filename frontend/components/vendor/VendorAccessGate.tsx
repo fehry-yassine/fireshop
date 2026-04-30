@@ -13,7 +13,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { PublicUser, Vendor, VendorApplication } from "@/types";
 
 type VendorAccessGateProps = {
-  children: (context: { vendor: Vendor }) => ReactNode;
+  children: (context: { user: PublicUser; vendor: Vendor }) => ReactNode;
 };
 
 export function VendorAccessGate({ children }: VendorAccessGateProps) {
@@ -134,9 +134,9 @@ export function VendorAccessGate({ children }: VendorAccessGateProps) {
 
   if (message || !vendor) {
     return (
-      <Card className="mx-auto mt-12 max-w-xl border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
+      <Card className="vendor-card mx-auto mt-12 max-w-xl">
         <CardContent className="space-y-4 py-10 text-center">
-          <h1 className="text-2xl font-bold text-white">Vendor profile unavailable</h1>
+          <h1 className="vendor-title text-2xl font-bold">Vendor profile unavailable</h1>
           <p className="text-sm text-red-300">
             {message ?? "Your active vendor profile could not be found."}
           </p>
@@ -145,7 +145,7 @@ export function VendorAccessGate({ children }: VendorAccessGateProps) {
     );
   }
 
-  return children({ vendor });
+  return children({ user, vendor });
 }
 
 function BuyerVendorGuidance({
@@ -372,10 +372,10 @@ function AdminVendorGuidance() {
 
 function VendorLoadingState({ label }: { label: string }) {
   return (
-    <Card className="mx-auto mt-12 max-w-xl border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
+    <Card className="vendor-card mx-auto mt-12 max-w-xl">
       <CardContent className="py-10 text-center">
-        <p className="text-sm font-semibold text-white">{label}</p>
-        <p className="mt-2 text-sm text-[#98A0B2]">Please wait a moment.</p>
+        <p className="vendor-title text-sm font-semibold">{label}</p>
+        <p className="vendor-muted mt-2 text-sm">Please wait a moment.</p>
       </CardContent>
     </Card>
   );

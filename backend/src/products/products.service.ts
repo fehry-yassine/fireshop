@@ -10,12 +10,16 @@ import {
   Category,
   Prisma,
   Product,
+  ProductImage,
   ProductStatus,
   Role,
   User,
   Vendor,
   VendorStatus,
 } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import { mkdir, writeFile } from 'fs/promises';
+import { extname, join } from 'path';
 import { AuthTokenPayload } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -34,10 +38,35 @@ type ProductPayload = {
   isActive?: unknown;
   isFeatured?: unknown;
   isOnOffer?: unknown;
+  rejectionReason?: unknown;
+};
+
+type UploadedImageFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
 };
 
 type PublicProductFilter = {
   categorySlug?: string;
+};
+
+type AdminProductsQuery = {
+  status?: unknown;
+  vendorId?: unknown;
+  search?: unknown;
+  category?: unknown;
+  page?: unknown;
+  limit?: unknown;
+};
+
+type AdminProductRejectPayload = {
+  reason?: unknown;
+};
+
+type AdminProductFeaturePayload = {
+  featured?: unknown;
 };
 
 type RecommendationLocale = 'auto' | 'en' | 'fr' | 'ar_tn';
@@ -111,6 +140,7 @@ type ParsedNeed = {
 
 type ProductWithRelations = Product & {
   category: Category;
+  images: ProductImage[];
   vendor: Vendor & { user: User };
 };
 
@@ -121,10 +151,12 @@ const VENDOR_RESTRICTED_FIELDS: Array<keyof ProductPayload> = [
   'isActive',
   'isFeatured',
   'isOnOffer',
+  'rejectionReason',
 ];
 
 const VALID_LOCALES: RecommendationLocale[] = ['auto', 'en', 'fr', 'ar_tn'];
 const FEEDBACK_ACTIONS: FeedbackAction[] = ['view', 'click', 'add_to_cart'];
+const PRODUCT_STATUSES = Object.values(ProductStatus);
 
 @Injectable()
 export class ProductsService {
@@ -327,7 +359,7 @@ export class ProductsService {
             'stockQuantity',
             0,
           ),
-          status: ProductStatus.PENDING_APPROVAL,
+          status: ProductStatus.DRAFT,
           isActive: true,
           isFeatured: false,
           isOnOffer: false,
@@ -350,6 +382,44 @@ export class ProductsService {
     }
   }
 
+  async uploadVendorProductImage(
+    currentUser: AuthTokenPayload,
+    file: UploadedImageFile | undefined,
+  ) {
+    const vendor = await this.findActiveVendorForUser(currentUser);
+
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+
+    if (!file.mimetype?.startsWith('image/')) {
+      throw new BadRequestException('Only image files are allowed');
+    }
+
+    if (!file.buffer || file.size <= 0) {
+      throw new BadRequestException('Image upload failed');
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException(
+        'Image is too large. Please upload a smaller image.',
+      );
+    }
+
+    const uploadDir = join(process.cwd(), 'uploads', 'product-images');
+    await mkdir(uploadDir, { recursive: true });
+
+    const extension = this.resolveImageFileExtension(file);
+    const filename = `${vendor.id}-${Date.now()}-${randomUUID()}${extension}`;
+    const absolutePath = join(uploadDir, filename);
+
+    await writeFile(absolutePath, file.buffer);
+
+    return {
+      url: `/api/uploads/product-images/${filename}`,
+    };
+  }
+
   async updateVendorProduct(
     currentUser: AuthTokenPayload,
     id: string,
@@ -366,7 +436,6 @@ export class ProductsService {
     this.rejectVendorRestrictedFields(body);
 
     const data: Prisma.ProductUpdateInput = {};
-    let hasContentChange = false;
     const imageUrls =
       body.imageUrls !== undefined || body.images !== undefined
         ? this.optionalImageUrls(body.imageUrls ?? body.images)
@@ -376,29 +445,24 @@ export class ProductsService {
       const categoryId = this.requiredString(body.categoryId, 'categoryId');
       await this.validateCategory(categoryId);
       data.category = { connect: { id: categoryId } };
-      hasContentChange = true;
     }
 
     if (body.name !== undefined) {
       data.name = this.requiredString(body.name, 'name');
-      hasContentChange = true;
     }
 
     if (body.slug !== undefined) {
       data.slug = this.normalizeSlug(body.slug);
-      hasContentChange = true;
     }
 
     if (body.description !== undefined) {
       data.description =
         this.optionalString(body.description, 'description') ??
         'No description provided.';
-      hasContentChange = true;
     }
 
     if (body.price !== undefined) {
       data.price = this.positiveNumber(body.price, 'price');
-      hasContentChange = true;
     }
 
     if (body.stockQuantity !== undefined) {
@@ -418,17 +482,15 @@ export class ProductsService {
           sortOrder: index,
         })),
       };
-      hasContentChange = true;
     }
 
     if (Object.keys(data).length === 0) {
       throw new BadRequestException('At least one field is required');
     }
 
-    if (hasContentChange) {
-      data.status = ProductStatus.PENDING_APPROVAL;
-      data.isActive = true;
-    }
+    data.status = ProductStatus.DRAFT;
+    data.isActive = true;
+    data.rejectionReason = null;
 
     try {
       return await this.prisma.product.update({
@@ -439,6 +501,37 @@ export class ProductsService {
     } catch (error) {
       this.handlePrismaError(error);
     }
+  }
+
+  async publishVendorProduct(currentUser: AuthTokenPayload, id: string) {
+    const vendor = await this.findActiveVendorForUser(currentUser);
+    const product = await this.findVendorProductWithRelationsOrThrow(vendor.id, id);
+
+    if (product.status === ProductStatus.ARCHIVED) {
+      throw new ConflictException('Archived products cannot be published');
+    }
+
+    if (
+      product.status !== ProductStatus.DRAFT &&
+      product.status !== ProductStatus.REJECTED
+    ) {
+      throw new ConflictException('Only draft or rejected products can be published');
+    }
+
+    const validationErrors = this.validateProductForPublishing(product);
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(validationErrors.join('; '));
+    }
+
+    return this.prisma.product.update({
+      where: { id: product.id },
+      data: {
+        isActive: true,
+        status: ProductStatus.PENDING_REVIEW,
+        rejectionReason: null,
+      },
+      include: this.productIncludes(),
+    });
   }
 
   async archiveVendorProduct(currentUser: AuthTokenPayload, id: string) {
@@ -457,14 +550,73 @@ export class ProductsService {
 
   async findPendingAdmin() {
     return this.prisma.product.findMany({
-      where: { status: ProductStatus.PENDING_APPROVAL },
+      where: { status: ProductStatus.PENDING_REVIEW },
       include: this.productIncludes(),
       orderBy: { createdAt: 'desc' },
     });
   }
 
+  async findAllAdmin(query: AdminProductsQuery = {}) {
+    const parsed = this.parseAdminProductsQuery(query);
+    const where = this.adminProductWhere(parsed);
+
+    const [products, total, pendingCount, publishedCount, rejectedCount, archivedCount] =
+      await this.prisma.$transaction([
+        this.prisma.product.findMany({
+          where,
+          include: this.productIncludes(),
+          orderBy: { createdAt: 'desc' },
+          skip: (parsed.page - 1) * parsed.limit,
+          take: parsed.limit,
+        }),
+        this.prisma.product.count({ where }),
+        this.prisma.product.count({
+          where: { ...where, status: ProductStatus.PENDING_REVIEW },
+        }),
+        this.prisma.product.count({
+          where: { ...where, status: ProductStatus.PUBLISHED },
+        }),
+        this.prisma.product.count({
+          where: { ...where, status: ProductStatus.REJECTED },
+        }),
+        this.prisma.product.count({
+          where: { ...where, status: ProductStatus.ARCHIVED },
+        }),
+      ]);
+
+    return {
+      items: products.map((product) => this.toAdminProductListItem(product)),
+      pagination: {
+        page: parsed.page,
+        limit: parsed.limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / parsed.limit)),
+      },
+      stats: {
+        pendingReview: pendingCount,
+        published: publishedCount,
+        rejected: rejectedCount,
+        archived: archivedCount,
+      },
+    };
+  }
+
+  async findByIdAdmin(id: string) {
+    const product = await this.findProductWithRelationsByIdOrThrow(id);
+    return this.toAdminProductDetails(product);
+  }
+
   async approveProductAdmin(id: string) {
     const product = await this.findProductWithRelationsByIdOrThrow(id);
+
+    if (
+      product.status !== ProductStatus.PENDING_REVIEW &&
+      product.status !== ProductStatus.APPROVED
+    ) {
+      throw new ConflictException(
+        'Only pending review or approved products can be published',
+      );
+    }
 
     this.ensureProductCanBePublished(product);
 
@@ -473,13 +625,16 @@ export class ProductsService {
       data: {
         status: ProductStatus.PUBLISHED,
         isActive: true,
+        rejectionReason: null,
       },
       include: this.productIncludes(),
     });
   }
 
-  async rejectProductAdmin(id: string) {
+  async rejectProductAdmin(id: string, payload: unknown) {
     const product = await this.findProductByIdOrThrow(id);
+    const body = this.asAdminRejectPayload(payload);
+    const reason = this.requiredString(body.reason, 'reason');
 
     if (product.status === ProductStatus.ARCHIVED) {
       throw new ConflictException('Archived products cannot be rejected');
@@ -487,7 +642,11 @@ export class ProductsService {
 
     return this.prisma.product.update({
       where: { id: product.id },
-      data: { status: ProductStatus.REJECTED },
+      data: {
+        status: ProductStatus.REJECTED,
+        isActive: false,
+        rejectionReason: reason,
+      },
       include: this.productIncludes(),
     });
   }
@@ -503,6 +662,164 @@ export class ProductsService {
       },
       include: this.productIncludes(),
     });
+  }
+
+  async featureProductAdmin(id: string, payload: unknown) {
+    const product = await this.findProductByIdOrThrow(id);
+    const body = this.asAdminFeaturePayload(payload);
+    const featured = this.requiredBoolean(body.featured, 'featured');
+
+    return this.prisma.product.update({
+      where: { id: product.id },
+      data: { isFeatured: featured },
+      include: this.productIncludes(),
+    });
+  }
+
+  private parseAdminProductsQuery(query: AdminProductsQuery) {
+    const page = this.optionalPositiveInt(query.page, 'page') ?? 1;
+    const limit = this.optionalPositiveInt(query.limit, 'limit') ?? 20;
+
+    if (limit > 100) {
+      throw new BadRequestException('limit must be between 1 and 100');
+    }
+
+    const status = this.optionalProductStatus(query.status);
+    const vendorId = this.optionalString(query.vendorId, 'vendorId');
+    const search = this.optionalString(query.search, 'search');
+    const category = this.optionalString(query.category, 'category');
+
+    return {
+      page,
+      limit,
+      status,
+      vendorId,
+      search,
+      category,
+    };
+  }
+
+  private adminProductWhere(query: {
+    status: ProductStatus | null;
+    vendorId: string | null;
+    search: string | null;
+    category: string | null;
+  }): Prisma.ProductWhereInput {
+    const where: Prisma.ProductWhereInput = {};
+    const andFilters: Prisma.ProductWhereInput[] = [];
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { slug: { contains: query.search, mode: 'insensitive' } },
+        { vendor: { storeName: { contains: query.search, mode: 'insensitive' } } },
+        { category: { name: { contains: query.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (query.vendorId) {
+      andFilters.push(
+        {
+          OR: [
+            { vendorId: query.vendorId },
+            { vendor: { storeName: { contains: query.vendorId, mode: 'insensitive' } } },
+            { vendor: { slug: { contains: query.vendorId, mode: 'insensitive' } } },
+          ],
+        },
+      );
+    }
+
+    if (query.category) {
+      andFilters.push(
+        {
+          OR: [
+            { categoryId: query.category },
+            { category: { slug: { contains: query.category, mode: 'insensitive' } } },
+            { category: { name: { contains: query.category, mode: 'insensitive' } } },
+          ],
+        },
+      );
+    }
+
+    if (andFilters.length > 0) {
+      where.AND = andFilters;
+    }
+
+    return where;
+  }
+
+  private toAdminProductListItem(
+    product: Product & {
+      vendor: { storeName: string };
+      category: { name: string };
+      images: Array<{ url: string }>;
+    },
+  ) {
+    return {
+      id: product.id,
+      image: product.images[0]?.url ?? null,
+      name: product.name,
+      title: product.name,
+      slug: product.slug,
+      price: Number(product.offerPrice ?? product.price),
+      stock: product.stockQuantity,
+      status: product.status,
+      vendorName: product.vendor.storeName,
+      categoryName: product.category.name,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    };
+  }
+
+  private toAdminProductDetails(product: ProductWithRelations) {
+    return {
+      id: product.id,
+      name: product.name,
+      title: product.name,
+      slug: product.slug,
+      description: product.description,
+      status: product.status,
+      price: Number(product.price),
+      offerPrice:
+        product.offerPrice === null ? null : Number(product.offerPrice),
+      stock: product.stockQuantity,
+      isActive: product.isActive,
+      isFeatured: product.isFeatured,
+      isOnOffer: product.isOnOffer,
+      rejectionReason: product.rejectionReason,
+      images: product.images.map((image) => ({
+        id: image.id,
+        url: image.url,
+        altText: image.altText,
+        sortOrder: image.sortOrder,
+        createdAt: image.createdAt,
+      })),
+      vendor: {
+        id: product.vendor.id,
+        storeName: product.vendor.storeName,
+        slug: product.vendor.slug,
+        status: product.vendor.status,
+        isActive: product.vendor.isActive,
+        owner: {
+          id: product.vendor.user.id,
+          fullName: product.vendor.user.fullName,
+          email: product.vendor.user.email,
+          isActive: product.vendor.user.isActive,
+        },
+      },
+      category: {
+        id: product.category.id,
+        name: product.category.name,
+        slug: product.category.slug,
+        isActive: product.category.isActive,
+      },
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    };
   }
 
   private buildSummary(input: {
@@ -1083,6 +1400,40 @@ export class ProductsService {
     return this.clamp(parsed, 1, 12);
   }
 
+  private optionalPositiveInt(value: unknown, field: string) {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+
+    const parsed =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string'
+          ? Number(value)
+          : Number.NaN;
+
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new BadRequestException(`${field} must be a positive integer`);
+    }
+
+    return parsed;
+  }
+
+  private optionalProductStatus(value: unknown) {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+
+    if (
+      typeof value !== 'string' ||
+      !PRODUCT_STATUSES.includes(value as ProductStatus)
+    ) {
+      throw new BadRequestException('status is invalid');
+    }
+
+    return value as ProductStatus;
+  }
+
   private parseFeedbackAction(value: unknown): FeedbackAction {
     if (typeof value !== 'string') {
       throw new BadRequestException('action is required');
@@ -1111,6 +1462,22 @@ export class ProductsService {
     }
 
     return payload as RecommendationFeedbackPayload;
+  }
+
+  private asAdminRejectPayload(payload: unknown): AdminProductRejectPayload {
+    if (!payload || typeof payload !== 'object') {
+      throw new BadRequestException('Request body is required');
+    }
+
+    return payload as AdminProductRejectPayload;
+  }
+
+  private asAdminFeaturePayload(payload: unknown): AdminProductFeaturePayload {
+    if (!payload || typeof payload !== 'object') {
+      throw new BadRequestException('Request body is required');
+    }
+
+    return payload as AdminProductFeaturePayload;
   }
 
   private publicWhere(filter: PublicProductFilter): Prisma.ProductWhereInput {
@@ -1159,6 +1526,9 @@ export class ProductsService {
     return {
       vendor: { include: { user: true } },
       category: true,
+      images: {
+        orderBy: { sortOrder: 'asc' as const },
+      },
     };
   }
 
@@ -1198,6 +1568,22 @@ export class ProductsService {
     return product;
   }
 
+  private async findVendorProductWithRelationsOrThrow(
+    vendorId: string,
+    id: string,
+  ) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, vendorId },
+      include: this.productRelationsInclude(),
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return product;
+  }
+
   private async findProductByIdOrThrow(id: string) {
     const product = await this.prisma.product.findUnique({ where: { id } });
 
@@ -1226,8 +1612,34 @@ export class ProductsService {
       throw new ConflictException('Archived products cannot be approved');
     }
 
+    const validationErrors = this.validateProductForPublishing(product);
+
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(validationErrors.join('; '));
+    }
+  }
+
+  private validateProductForPublishing(product: ProductWithRelations) {
+    const errors: string[] = [];
+
+    if (!product.name.trim()) {
+      errors.push('Product title is required');
+    }
+
+    if (!product.description || product.description.trim().length <= 50) {
+      errors.push('Product description must be longer than 50 characters');
+    }
+
+    if (Number(product.price) <= 0) {
+      errors.push('Product price must be greater than 0');
+    }
+
+    if (product.images.length === 0) {
+      errors.push('At least one product image is required');
+    }
+
     if (!product.category.isActive) {
-      throw new BadRequestException('Product category is inactive');
+      errors.push('Product category is inactive');
     }
 
     if (
@@ -1235,8 +1647,10 @@ export class ProductsService {
       product.vendor.status !== VendorStatus.APPROVED ||
       !product.vendor.user.isActive
     ) {
-      throw new BadRequestException('Product vendor is not active and approved');
+      errors.push('Product vendor is not active and approved');
     }
+
+    return errors;
   }
 
   private async validateCategory(categoryId: string) {
@@ -1315,6 +1729,24 @@ export class ProductsService {
     return urls;
   }
 
+  private resolveImageFileExtension(file: UploadedImageFile) {
+    const originalExtension = extname(file.originalname ?? '').toLowerCase();
+
+    if (originalExtension && originalExtension.length <= 6) {
+      return originalExtension;
+    }
+
+    const mimeToExt: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'image/gif': '.gif',
+    };
+
+    return mimeToExt[file.mimetype] ?? '.jpg';
+  }
+
   private isBase64ImageUrl(value: string) {
     return /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(
       value,
@@ -1391,6 +1823,14 @@ export class ProductsService {
     }
 
     return parsed;
+  }
+
+  private requiredBoolean(value: unknown, field: string) {
+    if (typeof value !== 'boolean') {
+      throw new BadRequestException(`${field} must be a boolean`);
+    }
+
+    return value;
   }
 
   private normalizeSlug(value: unknown, fallbackName?: string) {

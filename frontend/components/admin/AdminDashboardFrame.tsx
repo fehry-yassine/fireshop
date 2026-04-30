@@ -9,6 +9,7 @@ type AdminDashboardFrameProps = {
 
 const adminLinks = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/products", label: "Products" },
   { href: "/admin/vendors", label: "Vendors" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/categories", label: "Categories" },

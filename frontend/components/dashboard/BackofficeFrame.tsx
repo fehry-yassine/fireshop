@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { PublicUser } from "@/types";
 
 type BackofficeLink = {
   badge?: string;
@@ -24,6 +26,7 @@ type BackofficeFrameProps = {
   topTitle: string;
   topBadgeLabel: string;
   supportText: string;
+  user?: PublicUser;
 };
 
 type VendorTheme = "dark" | "light";
@@ -40,11 +43,16 @@ export function BackofficeFrame({
   topTitle,
   topBadgeLabel,
   supportText,
+  user,
 }: BackofficeFrameProps) {
+  const router = useRouter();
   const pathname = usePathname();
   const isFireShop = brand === "fireshop";
-  const initial = panelTitle.trim().charAt(0).toUpperCase() || "S";
+  const accountName = user?.fullName || panelTitle;
+  const initial = accountName.trim().charAt(0).toUpperCase() || "S";
   const [vendorTheme, setVendorTheme] = useState<VendorTheme>("dark");
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     if (!isFireShop) {
@@ -66,204 +74,216 @@ export function BackofficeFrame({
     });
   }
 
+  async function handleLogout() {
+    setIsLoggingOut(true);
+
+    try {
+      await api.auth.logout();
+    } catch {
+      // Continue locally even if the session was already expired on the server.
+    } finally {
+      setIsLoggingOut(false);
+      setIsAccountMenuOpen(false);
+    }
+
+    router.replace("/auth/login");
+    router.refresh();
+  }
+
   return (
     <section
       data-vendor-theme={isFireShop ? vendorTheme : undefined}
       className={cn(
-        "min-h-screen",
+        "min-h-screen lg:h-screen lg:overflow-hidden",
         isFireShop ? "vendor-fireshop-theme" : "bg-[#f4f5f8]",
       )}
     >
       <div
         className={cn(
-          "grid min-h-screen",
+          "grid min-h-screen lg:h-screen",
           isFireShop
-            ? "lg:grid-cols-[312px_minmax(0,1fr)]"
-            : "lg:grid-cols-[280px_minmax(0,1fr)]",
+            ? "lg:grid-cols-[268px_minmax(0,1fr)]"
+            : "lg:grid-cols-[248px_minmax(0,1fr)]",
         )}
       >
         <aside
           className={cn(
-            "p-4 text-white",
+            "overflow-hidden p-3 text-white lg:h-screen",
             isFireShop
               ? "vendor-sidebar"
               : "bg-[#311552]",
           )}
         >
-          <div className="flex h-full flex-col">
-            <div className="px-2 py-2">
-              <div className="flex items-center gap-3">
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="shrink-0 px-2 py-2">
+              <div className="flex flex-col items-start gap-3">
                 {isFireShop ? (
-                  <div className="vendor-logo-tile">
+                  <div className="vendor-logo-tile w-full">
                     <Image
                       alt="FireShop"
-                      className="h-8 w-auto object-contain"
-                      height={48}
-                      src="/branding/fireshop-mark.png"
-                      width={160}
+                      className="h-auto w-full max-w-[236px] object-contain"
+                      height={112}
+                      src="/branding/fireshop-logo.png"
+                      width={236}
                     />
                   </div>
                 ) : null}
-                <div>
-                  <p className="vendor-title text-3xl font-bold leading-none">FireShop</p>
-                  <p
-                    className={cn(
-                      "mt-1 text-xs font-semibold",
-                      isFireShop ? "vendor-accent-text" : "text-purple-200",
-                    )}
-                  >
-                    seller workspace
-                  </p>
-                </div>
               </div>
             </div>
 
             <div
               className={cn(
-                "mt-5 border px-4 py-3",
+                "mx-2 mt-2.5 shrink-0 border px-3 py-2",
                 isFireShop
-                  ? "vendor-store-card"
+                  ? "vendor-identity-card"
                   : "border-white/10 bg-[#8e43db]",
               )}
             >
-              <p
-                className={cn(
-                  "text-xs font-semibold uppercase tracking-normal",
-                  isFireShop ? "vendor-accent-text" : "text-purple-100",
-                )}
-              >
-                {panelLabel}
-              </p>
-              <p className="vendor-title mt-1 text-3xl font-extrabold leading-tight">
+              <div className="flex items-center justify-between gap-2">
+                <p
+                  className={cn(
+                    "text-[10px] font-bold uppercase tracking-[0.12em]",
+                    isFireShop ? "vendor-accent-text" : "text-purple-100",
+                  )}
+                >
+                  {panelLabel}
+                </p>
+                <span className={cn("text-[10px] font-semibold", isFireShop ? "vendor-subtle" : "text-purple-200")}>
+                  Workspace
+                </span>
+              </div>
+              <p className="vendor-title mt-1.5 text-[1.46rem] font-extrabold leading-[1.05]">
                 {panelTitle}
               </p>
-              <p className={cn("mt-1 text-sm", isFireShop ? "vendor-muted" : "text-purple-100")}>
+              <p className={cn("mt-1 text-[12px]", isFireShop ? "vendor-muted" : "text-purple-100")}>
                 {panelSubtitle}
               </p>
             </div>
 
-            <nav className="mt-5 space-y-1.5">
-              {links.map((item) => {
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== "/admin" &&
-                    item.href !== "/vendor" &&
-                    pathname.startsWith(`${item.href}/`));
+            <div className="vendor-sidebar-scroll mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
+              <nav className="space-y-1.5">
+                {links.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== "/admin" &&
+                      item.href !== "/vendor" &&
+                      pathname.startsWith(`${item.href}/`));
 
-                return item.disabled ? (
-                  <div
-                    className={cn(
-                      "flex h-12 cursor-not-allowed items-center justify-between rounded-xl px-4 text-sm font-semibold",
-                      isFireShop ? "vendor-nav-link vendor-nav-link-disabled" : "text-purple-200/70",
-                    )}
-                    key={item.href}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="vendor-nav-icon inline-flex h-7 w-7 items-center justify-center rounded-lg">
-                        <SidebarIcon label={item.label} />
-                      </span>
-                      <span>{item.label}</span>
+                  return item.disabled ? (
+                    <div
+                      className={cn(
+                        "flex h-12 cursor-not-allowed items-center justify-between rounded-xl px-4 text-sm font-semibold",
+                        isFireShop ? "vendor-nav-link vendor-nav-link-disabled" : "text-purple-200/70",
+                      )}
+                      key={item.href}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="vendor-nav-icon inline-flex h-7 w-7 items-center justify-center rounded-lg">
+                          <SidebarIcon label={item.label} />
+                        </span>
+                        <span>{item.label}</span>
+                      </div>
+                      {item.badge ? (
+                        <span
+                          className={cn(
+                            "rounded-full bg-white/10 px-2 py-1 text-xs",
+                            isFireShop ? "vendor-soft-pill" : "text-purple-100",
+                          )}
+                        >
+                          {item.badge}
+                        </span>
+                      ) : null}
                     </div>
-                    {item.badge ? (
-                      <span
-                        className={cn(
-                          "rounded-full bg-white/10 px-2 py-1 text-xs",
-                          isFireShop ? "vendor-soft-pill" : "text-purple-100",
-                        )}
-                      >
-                        {item.badge}
-                      </span>
-                    ) : null}
+                  ) : (
+                    <Link
+                      className={cn(
+                        "flex h-12 items-center justify-between rounded-xl px-4 text-sm font-semibold transition-colors",
+                        isFireShop
+                          ? isActive
+                            ? "vendor-nav-link vendor-nav-link-active"
+                            : "vendor-nav-link"
+                          : isActive
+                            ? "bg-white text-[#4b1d7a] hover:bg-white hover:text-[#4b1d7a]"
+                            : "text-purple-50 hover:bg-[#6d35a8] hover:text-white",
+                      )}
+                      href={item.href}
+                      key={item.href}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={cn(
+                            "inline-flex h-7 w-7 items-center justify-center rounded-lg",
+                            isFireShop ? "vendor-nav-icon" : isActive
+                              ? "bg-[#FFF4EB] text-[#FF6A2D]"
+                              : "bg-white/10 text-white/85",
+                          )}
+                        >
+                          <SidebarIcon label={item.label} />
+                        </span>
+                        <span>{item.label}</span>
+                      </div>
+                      {item.badge ? (
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-1 text-xs",
+                            isActive
+                              ? isFireShop
+                                ? "vendor-active-pill"
+                                : "bg-[#ffefeb] text-market-700"
+                              : isFireShop
+                                ? "vendor-soft-pill"
+                                : "bg-[#ff4d4d] text-white",
+                          )}
+                        >
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div
+                className={cn(
+                  "mt-5 rounded-2xl p-4 text-sm leading-6",
+                  isFireShop
+                    ? "vendor-help-card"
+                    : "bg-black/20 text-purple-50",
+                )}
+              >
+                <p className="vendor-title font-bold">Need help?</p>
+                <p className="mt-1">{supportText}</p>
+                {isFireShop ? (
+                  <div className="mt-4 flex items-center gap-2">
+                    <span className="vendor-soft-pill inline-flex h-9 min-w-10 items-center justify-center rounded-full px-3 text-xs font-bold">
+                      YouTube
+                    </span>
+                    <span className="vendor-soft-pill inline-flex h-9 min-w-10 items-center justify-center rounded-full px-3 text-xs font-bold">
+                      WhatsApp
+                    </span>
+                    <span className="vendor-soft-pill inline-flex h-9 min-w-10 items-center justify-center rounded-full px-3 text-xs font-bold">
+                      Meta
+                    </span>
                   </div>
-                ) : (
-                  <Link
-                    className={cn(
-                      "flex h-12 items-center justify-between rounded-xl px-4 text-sm font-semibold transition-colors",
-                      isFireShop
-                        ? isActive
-                          ? "vendor-nav-link vendor-nav-link-active"
-                          : "vendor-nav-link"
-                        : isActive
-                          ? "bg-white text-[#4b1d7a] hover:bg-white hover:text-[#4b1d7a]"
-                          : "text-purple-50 hover:bg-[#6d35a8] hover:text-white",
-                    )}
-                    href={item.href}
-                    key={item.href}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={cn(
-                          "inline-flex h-7 w-7 items-center justify-center rounded-lg",
-                          isFireShop ? "vendor-nav-icon" : isActive
-                            ? "bg-[#FFF4EB] text-[#FF6A2D]"
-                            : "bg-white/10 text-white/85",
-                        )}
-                      >
-                        <SidebarIcon label={item.label} />
-                      </span>
-                      <span>{item.label}</span>
-                    </div>
-                    {item.badge ? (
-                      <span
-                        className={cn(
-                          "rounded-full px-2 py-1 text-xs",
-                          isActive
-                            ? isFireShop
-                              ? "vendor-active-pill"
-                              : "bg-[#ffefeb] text-market-700"
-                            : isFireShop
-                              ? "vendor-soft-pill"
-                              : "bg-[#ff4d4d] text-white",
-                        )}
-                      >
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </Link>
-                );
-              })}
-            </nav>
-
-            <div
-              className={cn(
-                "mt-auto rounded-2xl p-4 text-sm leading-6",
-                isFireShop
-                  ? "vendor-help-card"
-                  : "bg-black/20 text-purple-50",
-              )}
-            >
-              <p className="vendor-title font-bold">Need help?</p>
-              <p className="mt-1">{supportText}</p>
-              {isFireShop ? (
-                <div className="mt-4 flex items-center gap-2">
-                  <span className="vendor-soft-pill inline-flex h-9 min-w-10 items-center justify-center rounded-full px-3 text-xs font-bold">
-                    YouTube
-                  </span>
-                  <span className="vendor-soft-pill inline-flex h-9 min-w-10 items-center justify-center rounded-full px-3 text-xs font-bold">
-                    WhatsApp
-                  </span>
-                  <span className="vendor-soft-pill inline-flex h-9 min-w-10 items-center justify-center rounded-full px-3 text-xs font-bold">
-                    Meta
-                  </span>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </div>
           </div>
         </aside>
 
-        <div className="min-w-0">
+        <div className="min-w-0 lg:flex lg:h-screen lg:min-h-0 lg:flex-col lg:overflow-hidden">
           <header
             className={cn(
-              "border-b px-4 py-4 lg:px-6",
+              "sticky top-0 z-20 min-h-[68px] border-b px-4 py-3 lg:shrink-0 lg:px-5",
               isFireShop
                 ? "vendor-topbar"
                 : "border-slate-200 bg-white",
             )}
           >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className={cn(isFireShop ? "space-y-1" : undefined)}>
+            <div className="flex min-h-[44px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className={cn(isFireShop ? "space-y-0" : undefined)}>
                 {isFireShop ? (
-                  <div className="vendor-muted flex items-center gap-2 text-sm font-semibold">
+                  <div className="vendor-muted flex items-center gap-2 text-[13px] font-semibold">
                     <span>{topTitle}</span>
                     <span>/</span>
                     <span className="vendor-soft-pill px-2.5 py-1 text-xs font-bold uppercase tracking-wide">
@@ -275,9 +295,11 @@ export function BackofficeFrame({
                     {topBadgeLabel}
                   </p>
                 )}
-                <h1 className={cn("text-xl font-bold", isFireShop ? "vendor-title" : "text-slate-900")}>
-                  {isFireShop ? panelTitle : topTitle}
-                </h1>
+                {!isFireShop ? (
+                  <h1 className="text-xl font-bold text-slate-900">
+                    {topTitle}
+                  </h1>
+                ) : null}
               </div>
               <div className="flex items-center gap-2 sm:gap-3">
                 {isFireShop ? (
@@ -298,23 +320,72 @@ export function BackofficeFrame({
                   </button>
                 ) : null}
                 {isFireShop ? (
-                  <div className="vendor-chip px-3 py-2 text-sm font-semibold">
+                  <div className="vendor-chip inline-flex h-11 items-center px-3 text-sm font-semibold">
                     {panelTitle}
                   </div>
                 ) : null}
-                <div
-                  className={cn(
-                    "flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white",
-                    isFireShop ? "vendor-avatar" : "bg-[#7457ff]",
-                  )}
-                >
-                  {isFireShop ? initial : "LM"}
-                </div>
+                {isFireShop ? (
+                  <div className="relative">
+                    <button
+                      aria-expanded={isAccountMenuOpen}
+                      aria-haspopup="menu"
+                      aria-label="Open account menu"
+                      className="vendor-account-button flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white"
+                      onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
+                      type="button"
+                    >
+                      {initial}
+                    </button>
+                    {isAccountMenuOpen ? (
+                      <div
+                        className="vendor-account-menu absolute right-0 top-12 z-40 w-72 rounded-lg border p-3"
+                        role="menu"
+                      >
+                        <div className="border-b pb-3">
+                          <p className="vendor-muted text-xs font-semibold uppercase tracking-wide">
+                            Vendor account
+                          </p>
+                          <p className="vendor-title mt-1 truncate text-sm font-bold">
+                            {panelTitle}
+                          </p>
+                          {user?.email ? (
+                            <p className="vendor-muted mt-0.5 truncate text-xs">
+                              {user.email}
+                            </p>
+                          ) : null}
+                          {user?.fullName ? (
+                            <p className="vendor-muted mt-2 truncate text-xs">
+                              Signed in as {user.fullName}
+                            </p>
+                          ) : null}
+                        </div>
+                        <button
+                          className="vendor-logout-button mt-3 flex h-10 w-full items-center justify-center rounded-lg px-3 text-sm font-bold"
+                          disabled={isLoggingOut}
+                          onClick={handleLogout}
+                          role="menuitem"
+                          type="button"
+                        >
+                          {isLoggingOut ? "Logging out" : "Logout"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#7457ff] text-sm font-bold text-white">
+                    LM
+                  </div>
+                )}
               </div>
             </div>
           </header>
 
-          <main className={cn("space-y-5 p-4 lg:p-6", isFireShop ? "vendor-main lg:p-8" : undefined)}>
+          <main
+            className={cn(
+              "space-y-4 p-5 pt-[18px] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5 lg:py-5",
+              isFireShop ? "vendor-main" : undefined,
+            )}
+          >
             {children}
           </main>
         </div>

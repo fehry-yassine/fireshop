@@ -21,7 +21,9 @@ enum VendorStatus {
 }
 
 enum ProductStatus {
-  PENDING_APPROVAL
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
   PUBLISHED
   REJECTED
   ARCHIVED
@@ -30,12 +32,10 @@ enum ProductStatus {
 enum OrderStatus {
   PENDING
   CONFIRMED
-  PREPARING
   SHIPPED
-  READY_FOR_DELIVERY
   DELIVERED
-  CANCELLED
   RETURNED
+  CANCELLED
 }
 
 enum PaymentMethod {
@@ -109,7 +109,8 @@ model Product {
   price         Decimal        @db.Decimal(10, 2)
   offerPrice    Decimal?       @db.Decimal(10, 2)
   stockQuantity Int            @default(0)
-  status        ProductStatus  @default(PENDING_APPROVAL)
+  status        ProductStatus  @default(DRAFT)
+  rejectionReason String?
   isActive      Boolean        @default(true)
   isFeatured    Boolean        @default(false)
   isOnOffer     Boolean        @default(false)
@@ -169,6 +170,7 @@ model Order {
   paymentMethod        PaymentMethod @default(CASH_ON_DELIVERY)
   paymentStatus        PaymentStatus @default(UNPAID)
   notes                String?
+  vendorDeletedAt      DateTime?
   buyer                User          @relation("BuyerOrders", fields: [buyerId], references: [id])
   vendor               Vendor        @relation(fields: [vendorId], references: [id])
   items                OrderItem[]
@@ -177,6 +179,7 @@ model Order {
 
   @@index([buyerId, status])
   @@index([vendorId, status])
+  @@index([vendorId, vendorDeletedAt])
 }
 
 model OrderItem {

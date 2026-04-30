@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 type SlideOverProps = {
@@ -19,6 +20,11 @@ export function SlideOver({
 }: SlideOverProps) {
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(false);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -62,11 +68,11 @@ export function SlideOver({
     };
   }, [shouldRender]);
 
-  if (!shouldRender) {
+  if (!shouldRender || !portalRoot) {
     return null;
   }
 
-  return (
+  return createPortal(
     <div
       aria-label={ariaLabel}
       aria-modal="true"
@@ -84,12 +90,13 @@ export function SlideOver({
       />
       <aside
         className={cn(
-          "absolute inset-y-0 right-0 flex w-full flex-col overflow-y-auto border-l border-[#242833] bg-[#0F1218] shadow-2xl shadow-black/45 transition-all duration-[250ms] ease-in-out will-change-transform sm:max-w-[1120px]",
+          "vendor-slide-over absolute right-0 top-0 flex h-full w-full flex-col overflow-y-auto border-l shadow-2xl transition-all duration-[250ms] ease-in-out will-change-transform sm:max-w-[1120px]",
           isVisible ? "translate-x-0 opacity-100" : "translate-x-full opacity-90",
         )}
       >
         {children}
       </aside>
-    </div>
+    </div>,
+    portalRoot,
   );
 }

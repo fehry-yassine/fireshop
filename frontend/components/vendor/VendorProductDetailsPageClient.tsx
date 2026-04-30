@@ -13,8 +13,8 @@ import type { Product } from "@/types";
 export function VendorProductDetailsPageClient({ productId }: { productId: string }) {
   return (
     <VendorAccessGate>
-      {({ vendor }) => (
-        <VendorDashboardFrame vendor={vendor}>
+      {({ user, vendor }) => (
+        <VendorDashboardFrame user={user} vendor={vendor}>
           <VendorProductDetailsContent productId={productId} />
         </VendorDashboardFrame>
       )}
@@ -68,10 +68,10 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
 
   if (isLoading) {
     return (
-      <Card className="border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
+      <Card className="vendor-card">
         <CardContent className="py-12 text-center">
-          <p className="text-sm font-semibold text-white">Loading product</p>
-          <p className="mt-2 text-sm text-[#98A0B2]">Please wait a moment.</p>
+          <p className="vendor-title text-sm font-semibold">Loading product</p>
+          <p className="vendor-muted mt-2 text-sm">Please wait a moment.</p>
         </CardContent>
       </Card>
     );
@@ -79,11 +79,11 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
 
   if (error || !product) {
     return (
-      <Card className="border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
+      <Card className="vendor-card">
         <CardContent className="py-12 text-center">
-          <p className="text-lg font-bold text-white">{error ?? "Product not found."}</p>
+          <p className="vendor-title text-lg font-bold">{error ?? "Product not found."}</p>
           <Link
-            className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-gradient-to-r from-[#FF6A2D] to-[#FF8F40] px-4 text-sm font-bold text-white transition-colors hover:from-[#FF7A3B] hover:to-[#FF9D56]"
+            className="vendor-primary-action mt-5 inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-bold transition-colors"
             href="/vendor/products"
           >
             Back to products
@@ -99,20 +99,20 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <Link className="text-sm font-bold text-[#FF8E4C]" href="/vendor/products">
+          <Link className="vendor-accent-text text-sm font-bold" href="/vendor/products">
             Products
           </Link>
-          <h2 className="mt-2 text-2xl font-bold text-white sm:text-3xl">
+          <h2 className="vendor-title mt-2 text-2xl font-bold sm:text-3xl">
             Product details
           </h2>
         </div>
         <ProductStatusBadge status={product.status} />
       </div>
 
-      <Card className="overflow-hidden border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
+      <Card className="vendor-card overflow-hidden">
         <CardContent className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <div className="space-y-3">
-            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-[#2A2E39] bg-[#241A14]">
+            <div className="vendor-upload-zone flex aspect-square items-center justify-center overflow-hidden rounded-lg border">
               {image?.url ? (
                 <img
                   alt={image.altText ?? product.name}
@@ -120,14 +120,14 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
                   src={image.url}
                 />
               ) : (
-                <span className="text-sm font-bold text-[#FF9B5D]">No image</span>
+                <span className="vendor-accent-text text-sm font-bold">No image</span>
               )}
             </div>
             {product.images && product.images.length > 1 ? (
               <div className="grid grid-cols-4 gap-2">
                 {product.images.slice(0, 4).map((item) => (
                   <div
-                    className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-[#2A2E39] bg-[#171B23]"
+                    className="vendor-image-cell flex aspect-square items-center justify-center overflow-hidden rounded-lg border"
                     key={item.id}
                   >
                     <img
@@ -143,11 +143,11 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
 
           <div className="space-y-6">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-normal text-[#8E96A8]">
+              <p className="vendor-muted text-xs font-semibold uppercase tracking-normal">
                 {shortId(product.id)}
               </p>
-              <h3 className="mt-1 text-3xl font-bold text-white">{product.name}</h3>
-              <p className="mt-2 text-sm text-[#8F97A8]">{product.slug}</p>
+              <h3 className="vendor-title mt-1 text-3xl font-bold">{product.name}</h3>
+              <p className="vendor-muted mt-2 text-sm">{product.slug}</p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -158,11 +158,20 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
             </div>
 
             <div>
-              <p className="text-sm font-bold text-white">Description</p>
-              <p className="mt-2 whitespace-pre-line rounded-lg border border-[#2A2E39] bg-[#171B23] p-4 text-sm leading-6 text-[#9CA4B5]">
+              <p className="vendor-title text-sm font-bold">Description</p>
+              <p className="vendor-panel-inset mt-2 whitespace-pre-line rounded-lg border p-4 text-sm leading-6">
                 {product.description || "No description provided."}
               </p>
             </div>
+
+            {product.rejectionReason ? (
+              <div>
+                <p className="text-sm font-bold text-red-600">Rejection reason</p>
+                <p className="mt-2 whitespace-pre-line rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
+                  {product.rejectionReason}
+                </p>
+              </div>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -172,39 +181,55 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
 
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[#2A2E39] bg-[#171B23] px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-normal text-[#8E96A8]">{label}</p>
-      <p className="mt-1 text-lg font-bold text-white">{value}</p>
+    <div className="vendor-panel-inset rounded-lg border px-4 py-3">
+      <p className="vendor-muted text-xs font-semibold uppercase tracking-normal">{label}</p>
+      <p className="vendor-title mt-1 text-lg font-bold">{value}</p>
     </div>
   );
 }
 
 function ProductStatusBadge({ status }: { status: Product["status"] }) {
+  if (status === "DRAFT") {
+    return (
+      <Badge className="vendor-status-neutral" tone="neutral">
+        Draft
+      </Badge>
+    );
+  }
+
   if (status === "PUBLISHED") {
     return (
-      <Badge className="border-emerald-900/30 bg-emerald-950/20 text-emerald-300" tone="neutral">
+      <Badge className="vendor-status-success" tone="neutral">
         Published
       </Badge>
     );
   }
 
-  if (status === "PENDING_APPROVAL") {
+  if (status === "PENDING_REVIEW") {
     return (
-      <Badge className="border-[#3D2D22] bg-[#261C16] text-[#FF9B5D]" tone="neutral">
-        Pending
+      <Badge className="vendor-status-warning" tone="neutral">
+        Pending review
+      </Badge>
+    );
+  }
+
+  if (status === "APPROVED") {
+    return (
+      <Badge className="bg-blue-50 text-blue-700" tone="neutral">
+        Approved
       </Badge>
     );
   }
 
   if (status === "REJECTED") {
     return (
-      <Badge className="border-red-900/35 bg-red-950/20 text-red-300" tone="neutral">
+      <Badge className="vendor-status-danger" tone="neutral">
         Rejected
       </Badge>
     );
   }
 
-  return <Badge className="border-[#2A2E39] bg-[#181C24] text-[#A6ADBD]">Archived</Badge>;
+  return <Badge className="vendor-status-neutral">Archived</Badge>;
 }
 
 function formatDate(value: string | undefined) {
@@ -238,5 +263,3 @@ function getProductError(error: unknown, fallback: string) {
 function shortId(value: string) {
   return value.slice(0, 8);
 }
-
-

@@ -5,9 +5,9 @@ import type { OrderStatus } from "@/types";
 export const ORDER_STATUS_OPTIONS: OrderStatus[] = [
   "PENDING",
   "CONFIRMED",
-  "PREPARING",
   "SHIPPED",
   "DELIVERED",
+  "RETURNED",
   "CANCELLED",
 ];
 
@@ -19,9 +19,9 @@ const TIMELINE_STATUSES: OrderStatus[] = [...ORDER_STEPS, "CANCELLED"];
 const STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING: "Pending",
   CONFIRMED: "Confirmed",
-  PREPARING: "Preparing",
   SHIPPED: "Shipped",
   DELIVERED: "Delivered",
+  RETURNED: "Returned",
   CANCELLED: "Cancelled",
 };
 
@@ -40,6 +40,14 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
 
   if (status === "DELIVERED") {
     return <Badge tone="success">{formatOrderStatus(status)}</Badge>;
+  }
+
+  if (status === "RETURNED") {
+    return (
+      <Badge className="bg-purple-100 text-purple-700" tone="neutral">
+        {formatOrderStatus(status)}
+      </Badge>
+    );
   }
 
   if (status === "PENDING") {

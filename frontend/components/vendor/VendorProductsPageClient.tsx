@@ -13,12 +13,14 @@ import { VendorDashboardFrame } from "@/components/vendor/VendorDashboardFrame";
 import { VendorProductForm } from "@/components/vendor/VendorProductFormPageClient";
 import { ApiError, api } from "@/lib/api";
 import { formatTnd } from "@/lib/format";
-import type { Category, Product, Vendor } from "@/types";
+import type { Category, Product } from "@/types";
 
 type ProductStatusFilter =
   | "ALL"
+  | "DRAFT"
+  | "APPROVED"
   | "PUBLISHED"
-  | "PENDING_APPROVAL"
+  | "PENDING_REVIEW"
   | "REJECTED"
   | "ARCHIVED";
 
@@ -41,16 +43,16 @@ type LoadProductsOptions = {
 export function VendorProductsPageClient() {
   return (
     <VendorAccessGate>
-      {({ vendor }) => (
-        <VendorDashboardFrame vendor={vendor}>
-          <VendorProductsContent vendor={vendor} />
+      {({ user, vendor }) => (
+        <VendorDashboardFrame user={user} vendor={vendor}>
+          <VendorProductsContent />
         </VendorDashboardFrame>
       )}
     </VendorAccessGate>
   );
 }
 
-function VendorProductsContent({ vendor }: { vendor: Vendor }) {
+function VendorProductsContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
@@ -111,7 +113,7 @@ function VendorProductsContent({ vendor }: { vendor: Vendor }) {
 
   const stats = useMemo(() => {
     const published = products.filter((product) => product.status === "PUBLISHED").length;
-    const pending = products.filter((product) => product.status === "PENDING_APPROVAL").length;
+    const pending = products.filter((product) => product.status === "PENDING_REVIEW").length;
     const outOfStock = products.filter((product) => product.stockQuantity <= 0).length;
     return {
       outOfStock,
@@ -163,6 +165,39 @@ function VendorProductsContent({ vendor }: { vendor: Vendor }) {
     }
   }
 
+  async function publishProduct(product: Product) {
+    const previousProduct = product;
+    setActiveProductId(product.id);
+    setMessage(null);
+
+    setProducts((current) =>
+      current.map((item) =>
+        item.id === product.id ? { ...item, status: "PENDING_REVIEW" } : item,
+      ),
+    );
+
+    try {
+      const publishedProduct = await api.vendors.products.publish(product.id);
+      setProducts((current) =>
+        current.map((item) => (item.id === product.id ? publishedProduct : item)),
+      );
+      setMessage({
+        text: "Product submitted for admin review.",
+        tone: "success",
+      });
+    } catch (error) {
+      setProducts((current) =>
+        current.map((item) => (item.id === product.id ? previousProduct : item)),
+      );
+      setMessage({
+        text: getProductError(error, "Could not publish product."),
+        tone: "error",
+      });
+    } finally {
+      setActiveProductId(null);
+    }
+  }
+
   async function handleProductSaved(successText: string) {
     setPanelState(null);
     await loadProducts({ successText });
@@ -170,18 +205,9 @@ function VendorProductsContent({ vendor }: { vendor: Vendor }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div className="space-y-2">
-          <p className="text-sm font-semibold text-[#FF6A2D]">{vendor.storeName}</p>
-          <h2 className="text-2xl font-bold text-white sm:text-3xl">
-            Product Management
-          </h2>
-          <p className="max-w-2xl text-sm leading-6 text-[#98A0B2]">
-            Manage your catalog, visibility, stock, and marketplace performance.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <Button
-          className="h-11 bg-gradient-to-r from-[#FF6A2D] to-[#FF8F40] px-5 shadow-lg shadow-orange-950/35 hover:from-[#FF7A3B] hover:to-[#FF9D56] focus-visible:ring-[#FF6A2D]/30"
+          className="vendor-primary-action h-11 px-5"
           onClick={() => setPanelState({ mode: "create" })}
         >
           + Add Product
@@ -191,16 +217,16 @@ function VendorProductsContent({ vendor }: { vendor: Vendor }) {
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <InventoryMetric label="Total Products" value={isLoading ? "--" : `${stats.total}`} />
         <InventoryMetric label="Published" tone="success" value={isLoading ? "--" : `${stats.published}`} />
-        <InventoryMetric label="Pending Approval" tone="warning" value={isLoading ? "--" : `${stats.pending}`} />
+        <InventoryMetric label="Pending Review" tone="warning" value={isLoading ? "--" : `${stats.pending}`} />
         <InventoryMetric label="Out of Stock" tone="danger" value={isLoading ? "--" : `${stats.outOfStock}`} />
       </div>
 
-      <Card className="overflow-hidden border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
-        <div className="border-b border-[#242833] bg-[#11141B] px-4 py-4 sm:px-5">
+      <Card className="vendor-card overflow-hidden">
+        <div className="vendor-toolbar border-b px-4 py-4 sm:px-5">
           <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_200px_200px_auto] lg:items-center">
             <Input
               aria-label="Search products"
-              className="h-12 border-[#2A2E39] bg-[#171B23] text-base text-[#EEF0F4] placeholder:text-[#737B8D] focus:border-[#FF6A2D] focus:ring-[#FF6A2D]/20"
+              className="vendor-input h-12 text-base"
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search products..."
               type="search"
@@ -208,7 +234,7 @@ function VendorProductsContent({ vendor }: { vendor: Vendor }) {
             />
 
             <select
-              className="h-12 rounded-xl border border-[#2A2E39] bg-[#171B23] px-3 text-sm font-semibold text-[#EEF0F4] outline-none transition focus:border-[#FF6A2D] focus:ring-2 focus:ring-[#FF6A2D]/20"
+              className="vendor-select h-12 rounded-lg px-3 text-sm font-semibold outline-none transition focus:ring-2"
               onChange={(event) => setCategoryFilter(event.target.value)}
               value={categoryFilter}
             >
@@ -221,18 +247,20 @@ function VendorProductsContent({ vendor }: { vendor: Vendor }) {
             </select>
 
             <select
-              className="h-12 rounded-xl border border-[#2A2E39] bg-[#171B23] px-3 text-sm font-semibold text-[#EEF0F4] outline-none transition focus:border-[#FF6A2D] focus:ring-2 focus:ring-[#FF6A2D]/20"
+              className="vendor-select h-12 rounded-lg px-3 text-sm font-semibold outline-none transition focus:ring-2"
               onChange={(event) => setStatusFilter(event.target.value as ProductStatusFilter)}
               value={statusFilter}
             >
               <option value="ALL">All statuses</option>
+              <option value="DRAFT">Draft</option>
+              <option value="PENDING_REVIEW">Pending review</option>
+              <option value="APPROVED">Approved</option>
               <option value="PUBLISHED">Published</option>
-              <option value="PENDING_APPROVAL">Pending approval</option>
               <option value="REJECTED">Rejected</option>
               <option value="ARCHIVED">Archived</option>
             </select>
 
-            <div className="rounded-xl border border-[#2A2E39] bg-[#171B23] px-4 py-3 text-sm font-semibold text-[#D5D9E1]">
+            <div className="vendor-chip rounded-lg px-4 py-3 text-sm font-semibold">
               {filteredProducts.length} shown
             </div>
           </div>
@@ -240,15 +268,15 @@ function VendorProductsContent({ vendor }: { vendor: Vendor }) {
 
         {isLoading ? (
           <CardContent className="py-12 text-center">
-            <p className="text-sm font-semibold text-white">Loading products</p>
-            <p className="mt-2 text-sm text-[#98A0B2]">Please wait a moment.</p>
+            <p className="vendor-title text-sm font-semibold">Loading products</p>
+            <p className="vendor-muted mt-2 text-sm">Please wait a moment.</p>
           </CardContent>
         ) : products.length === 0 ? (
           <EmptyProductsState onAdd={() => setPanelState({ mode: "create" })} />
         ) : filteredProducts.length === 0 ? (
           <CardContent className="py-12 text-center">
-            <p className="text-lg font-bold text-white">No matching products</p>
-            <p className="mt-2 text-sm text-[#98A0B2]">
+            <p className="vendor-title text-lg font-bold">No matching products</p>
+            <p className="vendor-muted mt-2 text-sm">
               Adjust search or filters to see more inventory.
             </p>
           </CardContent>
@@ -256,10 +284,10 @@ function VendorProductsContent({ vendor }: { vendor: Vendor }) {
           <div className="overflow-x-auto">
             <table className="min-w-[980px] w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-[#242833] bg-[#151922] text-left text-xs font-bold uppercase tracking-normal text-[#8E96A8]">
+                <tr className="vendor-table-head border-b text-left text-xs font-bold uppercase tracking-normal">
                   <th className="px-6 py-4">ID</th>
-                  <th className="px-6 py-4">Image</th>
-                  <th className="px-6 py-4">Name</th>
+                  <th className="px-6 py-4">Product Image</th>
+                  <th className="px-6 py-4">Product Name</th>
                   <th className="px-6 py-4">Price</th>
                   <th className="px-6 py-4">Stock</th>
                   <th className="px-6 py-4">Status</th>
@@ -274,6 +302,7 @@ function VendorProductsContent({ vendor }: { vendor: Vendor }) {
                     key={product.id}
                     onArchive={() => setArchiveCandidate(product)}
                     onEdit={() => setPanelState({ mode: "edit", product })}
+                    onPublish={() => publishProduct(product)}
                     product={product}
                   />
                 ))}
@@ -328,10 +357,10 @@ function InventoryMetric({
   }[tone];
 
   return (
-    <Card className="border-[#242833] bg-[#11141B] shadow-xl shadow-black/30">
+    <Card className="vendor-metric-card">
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-[#98A0B2]">
+          <p className="vendor-muted text-sm font-semibold">
             {label}
           </p>
           <div
@@ -340,7 +369,7 @@ function InventoryMetric({
             {label.slice(0, 1)}
           </div>
         </div>
-        <p className="text-4xl font-bold leading-none text-white">{value}</p>
+        <p className="vendor-title text-4xl font-bold leading-none">{value}</p>
       </CardContent>
     </Card>
   );
@@ -350,23 +379,29 @@ function ProductRow({
   isActive,
   onArchive,
   onEdit,
+  onPublish,
   product,
 }: {
   isActive: boolean;
   onArchive: () => void;
   onEdit: () => void;
+  onPublish: () => void;
   product: Product;
 }) {
   const image = product.images?.[0];
+  const canEdit = product.status === "DRAFT" || product.status === "REJECTED" || product.status === "PUBLISHED";
+  const canPublish = product.status === "DRAFT" || product.status === "REJECTED";
+  const canArchive = product.status === "DRAFT" || product.status === "PUBLISHED";
+  const isUnderReview = product.status === "PENDING_REVIEW";
 
   return (
     <>
-      <tr className="border-b border-[#242833] bg-[#11141B] align-middle transition-colors hover:bg-[#171B23]">
-        <td className="px-6 py-5 font-bold text-[#D5D9E1]">
+      <tr className="vendor-table-row border-b align-middle transition-colors">
+        <td className="vendor-title px-6 py-5 font-bold">
           {shortId(product.id)}
         </td>
         <td className="px-6 py-5">
-          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-[#2B303C] bg-[#191D27]">
+          <div className="vendor-image-cell flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border">
             {image?.url ? (
               <img
                 alt={image.altText ?? product.name}
@@ -374,24 +409,31 @@ function ProductRow({
                 src={image.url}
               />
             ) : (
-              <span className="text-xs font-bold text-[#717A8C]">IMG</span>
+              <span className="vendor-subtle text-xs font-bold">IMG</span>
             )}
           </div>
         </td>
         <td className="max-w-xs px-6 py-5">
-          <p className="line-clamp-2 font-bold text-white">{product.name}</p>
-          <p className="mt-1 break-all text-xs text-[#8F97A8]">{product.slug}</p>
+          <p className="vendor-title line-clamp-2 font-bold">{product.name}</p>
+          <p className="vendor-muted mt-1 break-all text-xs">{product.slug}</p>
+          {product.status === "REJECTED" ? (
+            <p className="mt-2 text-xs font-semibold text-red-500">
+              {product.rejectionReason
+                ? `Rejection reason: ${product.rejectionReason}`
+                : "Product rejected. Fix required fields and publish again."}
+            </p>
+          ) : null}
         </td>
-        <td className="px-6 py-5 font-bold text-white">
+        <td className="vendor-title px-6 py-5 font-bold">
           {formatTnd(product.offerPrice ?? product.price)}
         </td>
         <td className="px-6 py-5">
-          <span className="font-bold text-white">{product.stockQuantity}</span>
+          <span className="vendor-title font-bold">{product.stockQuantity}</span>
         </td>
         <td className="px-6 py-5">
           <ProductStatusBadge status={product.status} />
         </td>
-        <td className="px-6 py-5 text-[#8F97A8]">
+        <td className="vendor-muted px-6 py-5">
           {formatDate(product.createdAt)}
         </td>
         <td className="px-6 py-5">
@@ -403,16 +445,28 @@ function ProductRow({
               <EyeIcon />
             </IconLink>
             <IconButton
+              disabled={isActive || !canEdit}
               label={`Edit ${product.name}`}
               onClick={onEdit}
             >
               <PencilIcon />
             </IconButton>
+            {canPublish ? (
+              <IconButton
+                disabled={isActive}
+                label={`Publish ${product.name}`}
+                onClick={onPublish}
+              >
+                <PublishIcon />
+              </IconButton>
+            ) : null}
             <IconButton
-              disabled={isActive || product.status === "ARCHIVED"}
+              disabled={isActive || !canArchive}
               label={
                 product.status === "ARCHIVED"
                   ? `${product.name} is archived`
+                  : isUnderReview
+                    ? `${product.name} is under review`
                   : `Archive ${product.name}`
               }
               onClick={onArchive}
@@ -427,31 +481,47 @@ function ProductRow({
 }
 
 function ProductStatusBadge({ status }: { status: Product["status"] }) {
+  if (status === "DRAFT") {
+    return (
+      <Badge className="vendor-status-neutral" tone="neutral">
+        Draft
+      </Badge>
+    );
+  }
+
   if (status === "PUBLISHED") {
     return (
-      <Badge className="border-emerald-900/30 bg-emerald-950/20 text-emerald-300" tone="neutral">
+      <Badge className="vendor-status-success" tone="neutral">
         Published
       </Badge>
     );
   }
 
-  if (status === "PENDING_APPROVAL") {
+  if (status === "PENDING_REVIEW") {
     return (
-      <Badge className="border-[#3D2D22] bg-[#261C16] text-[#FF9B5D]" tone="neutral">
-        Pending
+      <Badge className="vendor-status-warning" tone="neutral">
+        Pending review
+      </Badge>
+    );
+  }
+
+  if (status === "APPROVED") {
+    return (
+      <Badge className="bg-blue-50 text-blue-700" tone="neutral">
+        Approved
       </Badge>
     );
   }
 
   if (status === "REJECTED") {
     return (
-      <Badge className="border-red-900/35 bg-red-950/20 text-red-300" tone="neutral">
+      <Badge className="vendor-status-danger" tone="neutral">
         Rejected
       </Badge>
     );
   }
 
-  return <Badge className="border-[#2A2E39] bg-[#181C24] text-[#A6ADBD]">Archived</Badge>;
+  return <Badge className="vendor-status-neutral">Archived</Badge>;
 }
 
 function IconLink({
@@ -466,7 +536,7 @@ function IconLink({
   return (
     <Link
       aria-label={label}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#2A2E39] bg-[#171B23] text-[#C2C7D1] transition-colors hover:border-[#4B3628] hover:bg-[#241A14] hover:text-[#FF9B5D]"
+      className="vendor-icon-button inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors"
       href={href}
       title={label}
     >
@@ -489,7 +559,7 @@ function IconButton({
   return (
     <button
       aria-label={label}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#2A2E39] bg-[#171B23] text-[#C2C7D1] transition-colors hover:border-[#4B3628] hover:bg-[#241A14] hover:text-[#FF9B5D] disabled:cursor-not-allowed disabled:opacity-45"
+      className="vendor-icon-button inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-45"
       disabled={disabled}
       onClick={onClick}
       title={label}
@@ -562,19 +632,39 @@ function ArchiveIcon() {
   );
 }
 
+function PublishIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path
+        d="M12 19V5m0 0-5 5m5-5 5 5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+      <path
+        d="M5 19h14"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
 function EmptyProductsState({ onAdd }: { onAdd?: () => void }) {
   return (
     <CardContent className="py-14 text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#3D2D22] bg-[#261C16] text-xl font-bold text-[#FF9B5D]">
+      <div className="vendor-soft-pill mx-auto flex h-16 w-16 items-center justify-center rounded-lg text-xl font-bold">
         +
       </div>
-      <h3 className="mt-5 text-2xl font-bold text-white">No products yet</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#98A0B2]">
-        Add your first product, submit it for admin approval, then track status and
+      <h3 className="vendor-title mt-5 text-2xl font-bold">No products yet</h3>
+      <p className="vendor-muted mx-auto mt-2 max-w-md text-sm leading-6">
+        Add your first product, publish it for review, then track status and
         stock from this seller dashboard.
       </p>
       <Button
-        className="mt-5 h-11 bg-gradient-to-r from-[#FF6A2D] to-[#FF8F40] px-5 hover:from-[#FF7A3B] hover:to-[#FF9D56] focus-visible:ring-[#FF6A2D]/30"
+        className="vendor-primary-action mt-5 h-11 px-5"
         onClick={onAdd}
       >
         Add first product
@@ -598,15 +688,15 @@ function Toast({
     <div
       className={
         message.tone === "success"
-          ? "fixed bottom-5 right-5 z-40 flex max-w-sm items-start gap-3 rounded-lg border border-emerald-900/35 bg-[#11141B] px-4 py-3 text-sm font-semibold text-emerald-300 shadow-2xl shadow-black/45"
-          : "fixed bottom-5 right-5 z-40 flex max-w-sm items-start gap-3 rounded-lg border border-red-900/35 bg-[#11141B] px-4 py-3 text-sm font-semibold text-red-300 shadow-2xl shadow-black/45"
+          ? "vendor-toast vendor-toast-success fixed bottom-5 right-5 z-40 flex max-w-sm items-start gap-3 rounded-lg border px-4 py-3 text-sm font-semibold"
+          : "vendor-toast vendor-toast-error fixed bottom-5 right-5 z-40 flex max-w-sm items-start gap-3 rounded-lg border px-4 py-3 text-sm font-semibold"
       }
     >
       <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-current" />
       <span className="leading-5">{message.text}</span>
       <button
         aria-label="Dismiss notification"
-        className="ml-2 text-[#8E96A8] transition-colors hover:text-white"
+        className="vendor-muted ml-2 transition-colors hover:opacity-80"
         onClick={onClose}
         type="button"
       >
@@ -633,22 +723,22 @@ function ArchiveConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
-      <div className="w-full max-w-md rounded-xl border border-[#2A2E39] bg-[#11141B] p-5 shadow-2xl shadow-black/50">
-        <p className="text-lg font-bold text-white">Archive product?</p>
-        <p className="mt-2 text-sm leading-6 text-[#98A0B2]">
+      <div className="vendor-dialog w-full max-w-md rounded-lg border p-5">
+        <p className="vendor-title text-lg font-bold">Archive product?</p>
+        <p className="vendor-muted mt-2 text-sm leading-6">
           {product.name} will be removed from the public marketplace catalog. This
           is different from Hidden visibility.
         </p>
         <div className="mt-5 flex justify-end gap-3">
           <Button
-            className="border-[#2A2E39] bg-[#171B23] text-[#D2D7E0] hover:border-[#353A48] hover:bg-[#1D212B]"
+            className="vendor-secondary-action"
             onClick={onCancel}
             variant="secondary"
           >
             Cancel
           </Button>
           <Button
-            className="bg-gradient-to-r from-[#FF6A2D] to-[#FF8F40] hover:from-[#FF7A3B] hover:to-[#FF9D56] focus-visible:ring-[#FF6A2D]/30"
+            className="vendor-primary-action"
             disabled={isArchiving}
             onClick={onConfirm}
           >
@@ -691,5 +781,3 @@ function formatDate(value: string | undefined) {
 function shortId(value: string) {
   return value.slice(0, 8);
 }
-
-

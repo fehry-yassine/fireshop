@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -39,8 +41,23 @@ export class VendorsController {
 
   @Get('orders')
   @UseGuards(JwtAuthGuard)
-  findVendorOrders(@CurrentUser() currentUser: AuthTokenPayload) {
-    return this.ordersService.findVendorOrders(currentUser);
+  findVendorOrders(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Query('status') status?: string,
+    @Query('deleted') deleted?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.ordersService.findVendorOrders(currentUser, {
+      deleted,
+      search,
+      status,
+    });
+  }
+
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard)
+  findVendorDashboard(@CurrentUser() currentUser: AuthTokenPayload) {
+    return this.ordersService.findVendorDashboard(currentUser);
   }
 
   @Patch('orders/:id/status')
@@ -55,6 +72,34 @@ export class VendorsController {
       id,
       body ?? {},
     );
+  }
+
+  @Post('orders')
+  @UseGuards(JwtAuthGuard)
+  createVendorOrder(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Body() body: unknown,
+  ) {
+    return this.ordersService.createVendorOrder(currentUser, body ?? {});
+  }
+
+  @Patch('orders/:id')
+  @UseGuards(JwtAuthGuard)
+  updateVendorOrder(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.ordersService.updateVendorOrder(currentUser, id, body ?? {});
+  }
+
+  @Delete('orders/:id')
+  @UseGuards(JwtAuthGuard)
+  softDeleteVendorOrder(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+  ) {
+    return this.ordersService.softDeleteVendorOrder(currentUser, id);
   }
 
   @Get(':slug')

@@ -14,7 +14,9 @@ import {
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
+  Prisma,
   Product,
+  ProductImage,
   ProductStatus,
   User,
   Vendor,
@@ -38,6 +40,36 @@ type StatusPayload = {
   status?: unknown;
 };
 
+type VendorOrderCreatePayload = {
+  status?: unknown;
+  fullName?: unknown;
+  phone?: unknown;
+  address?: unknown;
+  city?: unknown;
+  governorate?: unknown;
+  postalCode?: unknown;
+  notes?: unknown;
+  productId?: unknown;
+  quantity?: unknown;
+};
+
+type VendorOrderUpdatePayload = {
+  status?: unknown;
+  fullName?: unknown;
+  phone?: unknown;
+  address?: unknown;
+  city?: unknown;
+  governorate?: unknown;
+  postalCode?: unknown;
+  notes?: unknown;
+};
+
+type VendorOrderQuery = {
+  deleted?: unknown;
+  search?: unknown;
+  status?: unknown;
+};
+
 type CartItemWithProduct = CartItem & {
   product: Product & {
     category: Category;
@@ -48,19 +80,46 @@ type CartItemWithProduct = CartItem & {
 type OrderWithRelations = Order & {
   buyer: User;
   vendor: Vendor;
-  items: OrderItem[];
+  items: Array<
+    OrderItem & {
+      product: Product & {
+        images: ProductImage[];
+      };
+    }
+  >;
 };
 
 const ORDER_STATUS_FLOW: Record<string, OrderStatus[]> = {
-  [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-  [OrderStatus.CONFIRMED]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
-  [OrderStatus.PREPARING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
-  [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+  [OrderStatus.PENDING]: [
+    OrderStatus.CONFIRMED,
+    OrderStatus.CANCELLED,
+  ],
+  [OrderStatus.CONFIRMED]: [
+    OrderStatus.SHIPPED,
+    OrderStatus.CANCELLED,
+  ],
+  [OrderStatus.SHIPPED]: [
+    OrderStatus.DELIVERED,
+    OrderStatus.RETURNED,
+  ],
   [OrderStatus.DELIVERED]: [],
+  [OrderStatus.RETURNED]: [],
   [OrderStatus.CANCELLED]: [],
 };
 
 const V1_ORDER_STATUSES = Object.keys(ORDER_STATUS_FLOW);
+const REVENUE_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.DELIVERED,
+];
+const EXPECTED_REVENUE_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.CONFIRMED,
+  OrderStatus.SHIPPED,
+];
+const OPEN_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.PENDING,
+  OrderStatus.CONFIRMED,
+  OrderStatus.SHIPPED,
+];
 
 @Injectable()
 export class OrdersService {
@@ -103,7 +162,7 @@ export class OrdersService {
 
       if (vendorIds.size !== 1) {
         throw new ConflictException(
-          'Checkout supports one vendor per order in V1',
+          'Single-vendor checkout only. Please order from one vendor at a time.',
         );
       }
 
@@ -215,15 +274,133 @@ export class OrdersService {
     return this.toOrderResponse(order);
   }
 
-  async findVendorOrders(currentUser: AuthTokenPayload) {
+  async findVendorOrders(
+    currentUser: AuthTokenPayload,
+    query: VendorOrderQuery = {},
+  ) {
     const vendor = await this.findActiveVendorForUser(currentUser.sub);
+    const selectedStatus = this.optionalOrderStatus(query.status);
+    const showDeleted = this.optionalBoolean(query.deleted);
+    const search = this.optionalString(query.search, 'search');
+    const where: Prisma.OrderWhereInput = {
+      vendorId: vendor.id,
+      vendorDeletedAt: showDeleted ? { not: null } : null,
+    };
+
+    if (selectedStatus) {
+      where.status = selectedStatus;
+    }
+
+    if (search) {
+      where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { shippingFullName: { contains: search, mode: 'insensitive' } },
+        { shippingPhone: { contains: search, mode: 'insensitive' } },
+        { shippingCity: { contains: search, mode: 'insensitive' } },
+        {
+          items: {
+            some: {
+              OR: [
+                { productName: { contains: search, mode: 'insensitive' } },
+                { productSlug: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
+      ];
+    }
+
     const orders = await this.prisma.order.findMany({
-      where: { vendorId: vendor.id },
+      where,
       include: this.orderInclude(),
       orderBy: { createdAt: 'desc' },
     });
 
     return orders.map((order) => this.toOrderResponse(order));
+  }
+
+  async findVendorDashboard(currentUser: AuthTokenPayload) {
+    const vendor = await this.findActiveVendorForUser(currentUser.sub);
+    const now = new Date();
+    const startOfToday = this.startOfDay(now);
+    const startOfWeek = this.startOfWeek(now);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const baseWhere: Prisma.OrderWhereInput = {
+      vendorId: vendor.id,
+      vendorDeletedAt: null,
+    };
+    const revenueWhere: Prisma.OrderWhereInput = {
+      ...baseWhere,
+      status: { in: REVENUE_ORDER_STATUSES },
+    };
+    const expectedRevenueWhere: Prisma.OrderWhereInput = {
+      ...baseWhere,
+      status: { in: EXPECTED_REVENUE_ORDER_STATUSES },
+    };
+
+    const [
+      ordersToday,
+      ordersThisWeek,
+      ordersThisMonth,
+      totalOrders,
+      deliveredOrders,
+      returnedOrders,
+      openOrders,
+      revenue,
+      expectedRevenue,
+      recentOrders,
+    ] = await this.prisma.$transaction([
+      this.prisma.order.count({
+        where: { ...baseWhere, createdAt: { gte: startOfToday } },
+      }),
+      this.prisma.order.count({
+        where: { ...baseWhere, createdAt: { gte: startOfWeek } },
+      }),
+      this.prisma.order.count({
+        where: { ...baseWhere, createdAt: { gte: startOfMonth } },
+      }),
+      this.prisma.order.count({ where: baseWhere }),
+      this.prisma.order.count({
+        where: { ...baseWhere, status: OrderStatus.DELIVERED },
+      }),
+      this.prisma.order.count({
+        where: { ...baseWhere, status: OrderStatus.RETURNED },
+      }),
+      this.prisma.order.count({
+        where: { ...baseWhere, status: { in: OPEN_ORDER_STATUSES } },
+      }),
+      this.prisma.order.aggregate({
+        where: revenueWhere,
+        _sum: { total: true },
+      }),
+      this.prisma.order.aggregate({
+        where: expectedRevenueWhere,
+        _sum: { total: true },
+      }),
+      this.prisma.order.findMany({
+        where: baseWhere,
+        include: this.orderInclude(),
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+      }),
+    ]);
+
+    return {
+      ordersToday,
+      ordersThisWeek,
+      ordersThisMonth,
+      totalOrders,
+      deliveredOrders,
+      returnedOrders,
+      openOrders,
+      revenue: this.money(Number(revenue._sum.total ?? 0)),
+      expectedRevenue: this.money(Number(expectedRevenue._sum.total ?? 0)),
+      totalRevenue: this.money(Number(revenue._sum.total ?? 0)),
+      revenueStatuses: REVENUE_ORDER_STATUSES,
+      expectedRevenueStatuses: EXPECTED_REVENUE_ORDER_STATUSES,
+      openOrderStatuses: OPEN_ORDER_STATUSES,
+      recentOrders: recentOrders.map((order) => this.toOrderResponse(order)),
+    };
   }
 
   async updateVendorOrderStatus(
@@ -233,7 +410,7 @@ export class OrdersService {
   ) {
     const vendor = await this.findActiveVendorForUser(currentUser.sub);
     const order = await this.prisma.order.findFirst({
-      where: { id, vendorId: vendor.id },
+      where: { id, vendorId: vendor.id, vendorDeletedAt: null },
       include: this.orderInclude(),
     });
 
@@ -242,6 +419,187 @@ export class OrdersService {
     }
 
     return this.updateOrderStatus(order, payload);
+  }
+
+  async createVendorOrder(currentUser: AuthTokenPayload, payload: unknown) {
+    const vendor = await this.findActiveVendorForUser(currentUser.sub);
+    const body = this.asVendorOrderCreatePayload(payload);
+    const shippingFullName = this.requiredString(body.fullName, 'fullName');
+    const shippingPhone = this.requiredString(body.phone, 'phone');
+    const shippingAddressLine1 = this.requiredString(body.address, 'address');
+    const shippingCity = this.requiredString(body.city, 'city');
+    const shippingGovernorate =
+      this.optionalString(body.governorate, 'governorate') ?? shippingCity;
+    const shippingPostalCode = this.optionalString(body.postalCode, 'postalCode');
+    const notes = this.optionalString(body.notes, 'notes');
+    const productId = this.requiredString(body.productId, 'productId');
+    const quantity = this.requiredPositiveInt(body.quantity, 'quantity');
+    const nextStatus = this.optionalOrderStatus(body.status) ?? OrderStatus.PENDING;
+
+    const order = await this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.findFirst({
+        where: {
+          id: productId,
+          vendorId: vendor.id,
+          isActive: true,
+          status: ProductStatus.PUBLISHED,
+          category: { isActive: true },
+        },
+      });
+
+      if (!product) {
+        throw new BadRequestException('Selected product is not available');
+      }
+
+      this.ensureStockAvailable(product, quantity);
+
+      const unitPrice = this.unitPrice(product);
+      const subtotal = this.money(unitPrice * quantity);
+      const deliveryFee = 0;
+      const total = this.money(subtotal + deliveryFee);
+
+      const createdOrder = await tx.order.create({
+        data: {
+          buyerId: vendor.userId,
+          vendorId: vendor.id,
+          shippingFullName,
+          shippingPhone,
+          shippingAddressLine1,
+          shippingCity,
+          shippingGovernorate,
+          shippingPostalCode,
+          subtotal,
+          deliveryFee,
+          total,
+          status: nextStatus,
+          paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+          paymentStatus: PaymentStatus.UNPAID,
+          notes,
+          items: {
+            create: [
+              {
+                productId: product.id,
+                productName: product.name,
+                productSlug: product.slug,
+                unitPrice,
+                quantity,
+                subtotal,
+              },
+            ],
+          },
+        },
+        include: this.orderInclude(),
+      });
+
+      const updateResult = await tx.product.updateMany({
+        where: {
+          id: product.id,
+          stockQuantity: { gte: quantity },
+        },
+        data: {
+          stockQuantity: { decrement: quantity },
+        },
+      });
+
+      if (updateResult.count !== 1) {
+        throw new BadRequestException(
+          `${product.name} no longer has enough stock`,
+        );
+      }
+
+      return createdOrder;
+    });
+
+    return { order: this.toOrderResponse(order) };
+  }
+
+  async updateVendorOrder(
+    currentUser: AuthTokenPayload,
+    id: string,
+    payload: unknown,
+  ) {
+    const vendor = await this.findActiveVendorForUser(currentUser.sub);
+    const order = await this.prisma.order.findFirst({
+      where: { id, vendorId: vendor.id, vendorDeletedAt: null },
+      include: this.orderInclude(),
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const body = this.asVendorOrderUpdatePayload(payload);
+    const data: Prisma.OrderUpdateInput = {};
+
+    if (body.fullName !== undefined) {
+      data.shippingFullName = this.requiredString(body.fullName, 'fullName');
+    }
+
+    if (body.phone !== undefined) {
+      data.shippingPhone = this.requiredString(body.phone, 'phone');
+    }
+
+    if (body.address !== undefined) {
+      data.shippingAddressLine1 = this.requiredString(body.address, 'address');
+    }
+
+    if (body.city !== undefined) {
+      data.shippingCity = this.requiredString(body.city, 'city');
+    }
+
+    if (body.governorate !== undefined) {
+      const governorate = this.optionalString(body.governorate, 'governorate');
+      data.shippingGovernorate = governorate ?? order.shippingGovernorate;
+    }
+
+    if (body.postalCode !== undefined) {
+      data.shippingPostalCode = this.optionalString(body.postalCode, 'postalCode');
+    }
+
+    if (body.notes !== undefined) {
+      data.notes = this.optionalString(body.notes, 'notes');
+    }
+
+    if (body.status !== undefined) {
+      const nextStatus = this.requiredOrderStatus(body.status);
+      this.validateStatusTransition(order.status, nextStatus);
+      data.status = nextStatus;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return { order: this.toOrderResponse(order) };
+    }
+
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: order.id },
+      data,
+      include: this.orderInclude(),
+    });
+
+    return { order: this.toOrderResponse(updatedOrder) };
+  }
+
+  async softDeleteVendorOrder(
+    currentUser: AuthTokenPayload,
+    id: string,
+  ) {
+    const vendor = await this.findActiveVendorForUser(currentUser.sub);
+    const order = await this.prisma.order.findFirst({
+      where: { id, vendorId: vendor.id, vendorDeletedAt: null },
+      include: this.orderInclude(),
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: order.id },
+      data: { vendorDeletedAt: new Date() },
+      include: this.orderInclude(),
+    });
+
+    return { order: this.toOrderResponse(updatedOrder) };
   }
 
   async findAllAdmin(status?: unknown) {
@@ -370,7 +728,19 @@ export class OrdersService {
     return {
       buyer: true,
       vendor: true,
-      items: { orderBy: { createdAt: 'asc' as const } },
+      items: {
+        include: {
+          product: {
+            include: {
+              images: {
+                orderBy: { sortOrder: 'asc' as const },
+                take: 1,
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' as const },
+      },
     };
   }
 
@@ -393,21 +763,36 @@ export class OrdersService {
       deliveryFee: this.money(Number(order.deliveryFee)),
       total: this.money(Number(order.total)),
       notes: order.notes,
+      vendorDeletedAt: order.vendorDeletedAt,
       buyer: toPublicUser(order.buyer),
       vendor: {
         id: order.vendor.id,
         storeName: order.vendor.storeName,
         slug: order.vendor.slug,
       },
-      items: order.items.map((item) => ({
-        id: item.id,
-        productId: item.productId,
-        productName: item.productName,
-        productSlug: item.productSlug,
-        unitPrice: this.money(Number(item.unitPrice)),
-        quantity: item.quantity,
-        subtotal: this.money(Number(item.subtotal)),
-      })),
+      items: order.items.map((item) => {
+        const productImage = item.product.images[0] ?? null;
+
+        return {
+          id: item.id,
+          productId: item.productId,
+          productName: item.productName,
+          productSlug: item.productSlug,
+          productImage: productImage
+            ? {
+                id: productImage.id,
+                url: productImage.url,
+                altText: productImage.altText,
+                sortOrder: productImage.sortOrder,
+                createdAt: productImage.createdAt,
+              }
+            : null,
+          price: this.money(Number(item.unitPrice)),
+          unitPrice: this.money(Number(item.unitPrice)),
+          quantity: item.quantity,
+          subtotal: this.money(Number(item.subtotal)),
+        };
+      }),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
     };
@@ -427,6 +812,22 @@ export class OrdersService {
     }
 
     return payload as StatusPayload;
+  }
+
+  private asVendorOrderCreatePayload(payload: unknown): VendorOrderCreatePayload {
+    if (!payload || typeof payload !== 'object') {
+      throw new BadRequestException('Request body is required');
+    }
+
+    return payload as VendorOrderCreatePayload;
+  }
+
+  private asVendorOrderUpdatePayload(payload: unknown): VendorOrderUpdatePayload {
+    if (!payload || typeof payload !== 'object') {
+      throw new BadRequestException('Request body is required');
+    }
+
+    return payload as VendorOrderUpdatePayload;
   }
 
   private requiredString(value: unknown, field: string) {
@@ -450,6 +851,22 @@ export class OrdersService {
     return trimmed.length > 0 ? trimmed : null;
   }
 
+  private optionalBoolean(value: unknown) {
+    if (value === undefined || value === null || value === '') {
+      return false;
+    }
+
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true';
+    }
+
+    return Boolean(value);
+  }
+
   private optionalOrderStatus(value: unknown) {
     if (value === undefined || value === null || value === '') {
       return null;
@@ -466,11 +883,33 @@ export class OrdersService {
     return value as OrderStatus;
   }
 
+  private requiredPositiveInt(value: unknown, field: string) {
+    const parsed = Number(value);
+
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new BadRequestException(`${field} must be a positive integer`);
+    }
+
+    return parsed;
+  }
+
   private unitPrice(product: Product) {
     return this.money(Number(product.offerPrice ?? product.price));
   }
 
   private money(value: number) {
     return Number(value.toFixed(2));
+  }
+
+  private startOfDay(value: Date) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  private startOfWeek(value: Date) {
+    const start = this.startOfDay(value);
+    const daysSinceMonday = (start.getDay() + 6) % 7;
+    start.setDate(start.getDate() - daysSinceMonday);
+
+    return start;
   }
 }
