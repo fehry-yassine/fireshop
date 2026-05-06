@@ -3,8 +3,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "FireShop",
-  description: "FireShop Tunisia multi-vendor e-commerce platform.",
+  title: "Carthage Market",
+  description: "Carthage Market Tunisia multi-vendor e-commerce platform.",
 };
 
 export default function RootLayout({

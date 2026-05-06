@@ -1,5 +1,17 @@
 export type MoneyValue = number | string;
 
+export type Pagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type PaginatedResponse<T> = {
+  items: T[];
+  pagination: Pagination;
+};
+
 export type UserRole = "BUYER" | "VENDOR" | "ADMIN";
 export type VendorStatus = "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
 
@@ -40,8 +52,11 @@ export type Category = {
   name: string;
   slug: string;
   description?: string | null;
+  iconKey?: string | null;
+  imageUrl?: string | null;
   parentId?: string | null;
   isActive?: boolean;
+  sortOrder?: number | null;
   children?: Category[];
   createdAt?: string;
   updatedAt?: string;
@@ -69,7 +84,6 @@ export type Product = {
   status:
     | "DRAFT"
     | "PENDING_REVIEW"
-    | "APPROVED"
     | "PUBLISHED"
     | "REJECTED"
     | "ARCHIVED";

@@ -46,9 +46,13 @@ export class VendorsController {
     @Query('status') status?: string,
     @Query('deleted') deleted?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.ordersService.findVendorOrders(currentUser, {
       deleted,
+      limit,
+      page,
       search,
       status,
     });

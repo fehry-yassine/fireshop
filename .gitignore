@@ -24,6 +24,10 @@ pnpm-debug.log*
 # Prisma
 backend/prisma/dev.db
 
+# Runtime uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 # OS and editor
 .DS_Store
 Thumbs.db

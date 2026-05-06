@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 type SlideOverProps = {
@@ -20,11 +19,6 @@ export function SlideOver({
 }: SlideOverProps) {
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(false);
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setPortalRoot(document.body);
-  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -68,11 +62,11 @@ export function SlideOver({
     };
   }, [shouldRender]);
 
-  if (!shouldRender || !portalRoot) {
+  if (!shouldRender) {
     return null;
   }
 
-  return createPortal(
+  return (
     <div
       aria-label={ariaLabel}
       aria-modal="true"
@@ -96,7 +90,6 @@ export function SlideOver({
       >
         {children}
       </aside>
-    </div>,
-    portalRoot,
+    </div>
   );
 }

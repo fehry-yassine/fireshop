@@ -23,7 +23,6 @@ enum VendorStatus {
 enum ProductStatus {
   DRAFT
   PENDING_REVIEW
-  APPROVED
   PUBLISHED
   REJECTED
   ARCHIVED
@@ -171,6 +170,7 @@ model Order {
   paymentStatus        PaymentStatus @default(UNPAID)
   notes                String?
   vendorDeletedAt      DateTime?
+  stockRestoredAt      DateTime?
   buyer                User          @relation("BuyerOrders", fields: [buyerId], references: [id])
   vendor               Vendor        @relation(fields: [vendorId], references: [id])
   items                OrderItem[]
@@ -180,6 +180,7 @@ model Order {
   @@index([buyerId, status])
   @@index([vendorId, status])
   @@index([vendorId, vendorDeletedAt])
+  @@index([status, stockRestoredAt])
 }
 
 model OrderItem {
@@ -197,4 +198,18 @@ model OrderItem {
   updatedAt   DateTime @updatedAt
 
   @@index([orderId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
 }

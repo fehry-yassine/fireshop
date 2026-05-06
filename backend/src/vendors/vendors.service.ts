@@ -156,7 +156,11 @@ export class VendorsService {
     return vendors.map((vendor) => this.toAdminVendor(vendor));
   }
 
-  async approveApplicationAdmin(id: string, payload: unknown) {
+  async approveApplicationAdmin(
+    id: string,
+    payload: unknown,
+    currentUser?: AuthTokenPayload,
+  ) {
     const body = this.asPayload(payload, true);
     const application = await this.findByIdAdminOrThrow(id);
 
@@ -176,7 +180,7 @@ export class VendorsService {
         data: { role: Role.VENDOR },
       });
 
-      return tx.vendor.update({
+      const updatedVendor = await tx.vendor.update({
         where: { id },
         data: {
           status: VendorStatus.APPROVED,
@@ -185,12 +189,32 @@ export class VendorsService {
         },
         include: { user: true },
       });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: currentUser?.sub,
+          action: 'ADMIN_VENDOR_APPROVED',
+          entityType: 'Vendor',
+          entityId: updatedVendor.id,
+          metadata: {
+            previousStatus: application.status,
+            nextStatus: VendorStatus.APPROVED,
+            adminNote,
+          },
+        },
+      });
+
+      return updatedVendor;
     });
 
     return { vendor: this.toAdminVendor(vendor) };
   }
 
-  async rejectApplicationAdmin(id: string, payload: unknown) {
+  async rejectApplicationAdmin(
+    id: string,
+    payload: unknown,
+    currentUser?: AuthTokenPayload,
+  ) {
     const body = this.asPayload(payload);
     const application = await this.findByIdAdminOrThrow(id);
 
@@ -203,14 +227,32 @@ export class VendorsService {
       'adminNote',
     );
 
-    const vendor = await this.prisma.vendor.update({
-      where: { id },
-      data: {
-        status: VendorStatus.REJECTED,
-        isActive: false,
-        adminNote,
-      },
-      include: { user: true },
+    const vendor = await this.prisma.$transaction(async (tx) => {
+      const updatedVendor = await tx.vendor.update({
+        where: { id },
+        data: {
+          status: VendorStatus.REJECTED,
+          isActive: false,
+          adminNote,
+        },
+        include: { user: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: currentUser?.sub,
+          action: 'ADMIN_VENDOR_REJECTED',
+          entityType: 'Vendor',
+          entityId: application.id,
+          metadata: {
+            previousStatus: application.status,
+            nextStatus: VendorStatus.REJECTED,
+            adminNote,
+          },
+        },
+      });
+
+      return updatedVendor;
     });
 
     return { application: this.toApplication(vendor) };

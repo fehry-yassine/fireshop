@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthTokenPayload } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -10,6 +11,7 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post('checkout')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   checkout(
     @CurrentUser() currentUser: AuthTokenPayload,
     @Body() body: unknown,

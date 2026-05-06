@@ -1,53 +1,72 @@
 import Image from "next/image";
 import Link from "next/link";
 import { AuthNav } from "@/components/auth/AuthNav";
-import { Button } from "@/components/ui/Button";
+import { CategoryMegaMenu } from "@/components/layout/CategoryMegaMenu";
 import { Container } from "@/components/ui/Container";
-import { Input } from "@/components/ui/Input";
+
+function CarthageWordmark() {
+  return (
+    <span className="relative block h-14 w-[205px] overflow-hidden rounded-md sm:w-[220px]">
+      <Image
+        alt="Carthage Market"
+        className="object-cover object-left"
+        fill
+        priority
+        sizes="(min-width: 640px) 220px, 205px"
+        src="/branding/carthage-market-logo.png"
+      />
+    </span>
+  );
+}
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/60 backdrop-blur">
-      <Container className="py-3.5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-5">
-          <div className="flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#030712] shadow-[0_10px_44px_rgba(0,0,0,0.34)]">
+      <Container className="max-w-[1680px] py-2.5">
+        <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[235px_auto_minmax(340px,1fr)_auto_auto] xl:items-center">
+          <div className="flex min-w-0 items-center justify-between gap-4">
             <Link
-              className="flex items-center gap-2 rounded-md outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2"
+              className="rounded-lg outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[#2563FF]/60"
               href="/"
             >
-              <Image
-                alt="FireShop"
-                className="h-9 w-auto object-contain"
-                height={48}
-                src="/branding/fireshop-mark.png"
-                width={160}
-              />
+              <CarthageWordmark />
             </Link>
           </div>
 
+          <CategoryMegaMenu />
+
           <form
             action="/"
-            className="flex min-w-0 flex-1 gap-2 rounded-lg bg-slate-100/70 p-1"
+            className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)_44px] gap-2 overflow-hidden rounded-full border border-white/[0.10] bg-[#020817] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_0_32px_rgba(37,99,255,0.11)] focus-within:border-[#2563FF]/70 focus-within:ring-2 focus-within:ring-[#2563FF]/20"
             role="search"
           >
-            <Input
-              aria-label="Search products"
-              className="border-transparent bg-white shadow-sm shadow-slate-200/60"
+            <input
+              aria-label="Rechercher des produits"
+              className="h-10 min-w-0 rounded-full border-transparent bg-transparent px-4 text-sm text-white outline-none placeholder:text-[#7C8AA0]"
               name="q"
-              placeholder="Search products, vendors, or categories"
+              placeholder="Rechercher produits, categories, fournisseurs..."
               type="search"
             />
-            <Button className="shrink-0 px-4" type="submit">
-              Search
-            </Button>
+            <button
+              aria-label="Rechercher"
+              className="grid h-10 w-10 place-items-center rounded-full bg-[#2563FF] text-xs font-black text-white shadow-[0_0_26px_rgba(37,99,255,0.48)] transition hover:bg-[#3B82F6]"
+              type="submit"
+            >
+              Go
+            </button>
           </form>
 
-          <Link
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-market-300 bg-market-50 px-4 text-sm font-semibold text-market-800 transition hover:border-market-500 hover:bg-market-100"
-            href="/search"
+          <nav
+            aria-label="Marketplace"
+            className="flex min-w-0 max-w-full flex-wrap items-center gap-1 overflow-hidden text-sm font-bold text-[#CBD5E1] xl:justify-center"
           >
-            Search
-          </Link>
+            <Link className="rounded-lg px-3 py-2 hover:bg-white/5 hover:text-white" href="/#produits">
+              Produits
+            </Link>
+            <Link className="rounded-lg px-3 py-2 hover:bg-white/5 hover:text-white" href="/#offres">
+              Offres
+            </Link>
+          </nav>
 
           <AuthNav />
         </div>

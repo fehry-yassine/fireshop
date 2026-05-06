@@ -250,7 +250,6 @@ function AdminProductsContent() {
               <option value="ALL">All statuses</option>
               <option value="DRAFT">Draft</option>
               <option value="PENDING_REVIEW">Pending review</option>
-              <option value="APPROVED">Approved</option>
               <option value="PUBLISHED">Published</option>
               <option value="REJECTED">Rejected</option>
               <option value="ARCHIVED">Archived</option>
@@ -341,7 +340,7 @@ function AdminProductsContent() {
                           <Button className="h-9 px-3" onClick={() => openDrawer(item.id)} variant="secondary">
                             View
                           </Button>
-                          {(item.status === "PENDING_REVIEW" || item.status === "APPROVED") && (
+                          {item.status === "PENDING_REVIEW" && (
                             <Button
                               disabled={activeProductId === item.id}
                               onClick={() => approveProduct(item.id)}
@@ -535,7 +534,7 @@ function AdminProductDetailsPanel({
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        {(product.status === "PENDING_REVIEW" || product.status === "APPROVED") && (
+        {product.status === "PENDING_REVIEW" && (
           <Button disabled={activeProductId === product.id} onClick={onApprove}>
             Approve
           </Button>
@@ -562,10 +561,6 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
 
   if (status === "PENDING_REVIEW") {
     return <Badge tone="warning">Pending review</Badge>;
-  }
-
-  if (status === "APPROVED") {
-    return <Badge className="bg-blue-50 text-blue-700" tone="neutral">Approved</Badge>;
   }
 
   if (status === "PUBLISHED") {

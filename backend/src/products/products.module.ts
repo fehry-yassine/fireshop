@@ -5,12 +5,22 @@ import {
   ProductsController,
   VendorProductsController,
 } from './products.controller';
+import { ProductCrudService } from './product-crud.service';
+import { ProductLifecycleService } from './product-lifecycle.service';
+import { ProductMediaService } from './product-media.service';
+import { ProductQueryService } from './product-query.service';
 import { ProductsService } from './products.service';
 
 @Module({
   imports: [PrismaModule, AuthModule],
   controllers: [ProductsController, VendorProductsController],
-  providers: [ProductsService],
+  providers: [
+    ProductCrudService,
+    ProductLifecycleService,
+    ProductMediaService,
+    ProductQueryService,
+    ProductsService,
+  ],
   exports: [ProductsService],
 })
 export class ProductsModule {}

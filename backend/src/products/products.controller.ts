@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -18,6 +19,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProductsService } from './products.service';
+import { Throttle } from '@nestjs/throttler';
 
 type UploadedImageFile = {
   originalname: string;
@@ -26,13 +28,43 @@ type UploadedImageFile = {
   buffer: Buffer;
 };
 
+const MAX_IMAGE_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
+
+function imageUploadFileFilter(
+  _request: unknown,
+  file: { mimetype?: string },
+  callback: (error: Error | null, acceptFile: boolean) => void,
+) {
+  if (!file.mimetype || !ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
+    callback(
+      new BadRequestException(
+        'Only JPEG, PNG, WebP, and GIF image files are allowed',
+      ),
+      false,
+    );
+    return;
+  }
+
+  callback(null, true);
+}
+
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  findAll(@Query('category') categorySlug?: string) {
-    return this.productsService.findAllPublic({ categorySlug });
+  findAll(
+    @Query('category') categorySlug?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.productsService.findAllPublic({ categorySlug, page, limit });
   }
 
   @Get(':slug')
@@ -46,6 +78,7 @@ export class ProductsController {
   }
 
   @Post('recommend/feedback')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   feedback(@Body() body: unknown) {
     return this.productsService.recordRecommendationFeedback(body ?? {});
   }
@@ -58,8 +91,12 @@ export class VendorProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  findMyProducts(@CurrentUser() currentUser: AuthTokenPayload) {
-    return this.productsService.findVendorProducts(currentUser);
+  findMyProducts(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.productsService.findVendorProducts(currentUser, { page, limit });
   }
 
   @Post()
@@ -71,7 +108,16 @@ export class VendorProductsController {
   }
 
   @Post('upload-image')
-  @UseInterceptors(FileInterceptor('file'))
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: imageUploadFileFilter,
+      limits: {
+        fileSize: MAX_IMAGE_UPLOAD_SIZE_BYTES,
+        files: 1,
+      },
+    }),
+  )
   uploadProductImage(
     @CurrentUser() currentUser: AuthTokenPayload,
     @UploadedFile() file: UploadedImageFile,

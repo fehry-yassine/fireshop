@@ -5,6 +5,7 @@ import type {
   Category,
   Order,
   OrderStatus,
+  PaginatedResponse,
   Product,
   ProductRecommendationResponse,
   PublicUser,
@@ -21,6 +22,9 @@ const SERVER_API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://localhost:4000/api";
 const CLIENT_API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
+const CSRF_COOKIE_NAME = "localmarket_csrf_token";
+const CSRF_HEADER_NAME = "X-CSRF-Token";
+const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 type QueryValue = string | number | boolean | null | undefined;
 type ApiQuery = Record<string, QueryValue>;
@@ -49,6 +53,11 @@ type CheckoutPayload = {
   governorate?: string;
   postalCode?: string;
   notes?: string;
+};
+
+type CsrfTokenResponse = {
+  csrfToken: string;
+  headerName: string;
 };
 
 export class ApiError extends Error {
@@ -106,9 +115,82 @@ async function parseResponse(response: Response) {
   return response.text();
 }
 
+let csrfTokenCache: string | null = null;
+let csrfTokenPromise: Promise<string | null> | null = null;
+
+function requestMethod(method: string | undefined) {
+  return (method ?? "GET").toUpperCase();
+}
+
+function readCookie(name: string) {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const cookie = document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`));
+
+  if (!cookie) {
+    return null;
+  }
+
+  return decodeURIComponent(cookie.slice(name.length + 1));
+}
+
+async function ensureCsrfToken(timeoutMs: number) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const cookieToken = readCookie(CSRF_COOKIE_NAME);
+
+  if (cookieToken) {
+    csrfTokenCache = cookieToken;
+    return cookieToken;
+  }
+
+  if (csrfTokenCache) {
+    return csrfTokenCache;
+  }
+
+  csrfTokenPromise ??= fetch(buildUrl("/csrf-token"), {
+    cache: "no-store",
+    credentials: "include",
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+    .then(async (response) => {
+      const payload = await parseResponse(response);
+
+      if (!response.ok) {
+        const message =
+          payload && typeof payload === "object" && "message" in payload
+            ? String(payload.message)
+            : `API request failed with status ${response.status}`;
+
+        throw new ApiError(message, response.status, payload);
+      }
+
+      const token =
+        payload && typeof payload === "object" && "csrfToken" in payload
+          ? String((payload as CsrfTokenResponse).csrfToken)
+          : readCookie(CSRF_COOKIE_NAME);
+
+      csrfTokenCache = token || null;
+      return csrfTokenCache;
+    })
+    .finally(() => {
+      csrfTokenPromise = null;
+    });
+
+  return csrfTokenPromise;
+}
+
 async function request<T>(path: string, options: ApiRequestOptions = {}) {
   const { body, query, headers, timeoutMs = 5000, ...init } = options;
   const requestHeaders = new Headers(headers);
+  const method = requestMethod(init.method);
   let requestBody: BodyInit | undefined;
 
   if (body !== undefined) {
@@ -117,6 +199,17 @@ async function request<T>(path: string, options: ApiRequestOptions = {}) {
     } else {
       requestHeaders.set("Content-Type", "application/json");
       requestBody = JSON.stringify(body);
+    }
+  }
+
+  if (
+    STATE_CHANGING_METHODS.has(method) &&
+    !requestHeaders.has(CSRF_HEADER_NAME)
+  ) {
+    const csrfToken = await ensureCsrfToken(timeoutMs);
+
+    if (csrfToken) {
+      requestHeaders.set(CSRF_HEADER_NAME, csrfToken);
     }
   }
 
@@ -169,12 +262,16 @@ export const categories = {
   tree: () => request<Category[]>("/categories/tree"),
   getBySlug: (slug: string) => request<Category>(`/categories/${slug}`),
   productsByCategory: (slug: string) =>
-    request<Product[]>(`/categories/${slug}/products`),
+    request<PaginatedResponse<Product>>(`/categories/${slug}/products`).then(
+      (response) => response.items,
+    ),
 };
 
 export const products = {
-  list: (query?: { category?: string }) =>
-    request<Product[]>("/products", { query }),
+  list: (query?: { category?: string; page?: number; limit?: number }) =>
+    request<PaginatedResponse<Product>>("/products", { query }).then(
+      (response) => response.items,
+    ),
   getBySlug: (slug: string) => request<Product>(`/products/${slug}`),
 };
 
@@ -212,8 +309,16 @@ export const vendors = {
       body: payload,
     }),
   dashboard: () => request<VendorDashboardStats>("/vendors/dashboard"),
-  orders: (query?: { deleted?: boolean; search?: string; status?: OrderStatus }) =>
-    request<Order[]>("/vendors/orders", { query }),
+  orders: (query?: {
+    deleted?: boolean;
+    search?: string;
+    status?: OrderStatus;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<PaginatedResponse<Order>>("/vendors/orders", { query }).then(
+      (response) => response.items,
+    ),
   createOrder: (payload: VendorOrderUpsertPayload) =>
     request<{ order: Order }>("/vendors/orders", {
       method: "POST",
@@ -234,7 +339,10 @@ export const vendors = {
       body: { status },
   }),
   products: {
-    list: () => request<Product[]>("/vendor/products"),
+    list: (query?: { page?: number; limit?: number }) =>
+      request<PaginatedResponse<Product>>("/vendor/products", { query }).then(
+        (response) => response.items,
+      ),
     uploadImage: (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
@@ -365,8 +473,10 @@ export const admin = {
       request<VendorApplication[]>("/admin/vendors", { query }),
   },
   orders: {
-    list: (query?: { status?: OrderStatus }) =>
-      request<Order[]>("/admin/orders", { query }),
+    list: (query?: { status?: OrderStatus; page?: number; limit?: number }) =>
+      request<PaginatedResponse<Order>>("/admin/orders", { query }).then(
+        (response) => response.items,
+      ),
     updateStatus: (id: string, status: OrderStatus) =>
       request<{ order: Order }>(`/admin/orders/${id}/status`, {
         method: "PATCH",
