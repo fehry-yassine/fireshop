@@ -645,13 +645,13 @@ function OrderDrawer({
         onClick={onClose}
         type="button"
       />
-      <aside className="fixed right-0 top-0 z-50 flex h-screen w-full flex-col overflow-hidden bg-white shadow-2xl lg:w-[78vw] xl:w-[72vw] xl:max-w-[1180px]">
-        <div className="sticky top-0 z-10 flex min-h-20 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6">
+      <aside className="vendor-editor fixed right-0 top-0 z-50 flex h-full w-full min-h-0 flex-col overflow-hidden shadow-2xl lg:w-[78vw] xl:w-[72vw] xl:max-w-[1180px]">
+        <div className="vendor-topbar sticky top-0 z-20 flex min-h-20 items-center justify-between gap-4 border-b px-6">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            <p className="vendor-muted text-xs font-bold uppercase tracking-wide">
               {isCreateMode ? "Order creator" : isEditableMode ? "Order editor" : "Order view"}
             </p>
-            <h2 className="text-xl font-bold text-slate-950">
+            <h2 className="vendor-title text-xl font-bold">
               {isCreateMode
                 ? "Add new order"
                 : isEditableMode
@@ -672,7 +672,7 @@ function OrderDrawer({
             ) : null}
             <button
               aria-label="Close drawer"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+              className="vendor-icon-button inline-flex h-10 w-10 items-center justify-center rounded-lg border transition"
               onClick={onClose}
               type="button"
             >
@@ -940,24 +940,6 @@ function OrderDrawer({
           )}
         </div>
 
-        {isEditableMode ? (
-          <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-6 py-4">
-            <button
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-              onClick={onClose}
-              type="button"
-            >
-              Cancel
-            </button>
-            <Button
-              className="vendor-primary-action h-11 rounded-xl px-5"
-              disabled={isSaving}
-              onClick={onSave}
-            >
-              {isSaving ? "Saving" : isCreateMode ? "Create order" : "Save"}
-            </Button>
-          </div>
-        ) : null}
       </aside>
     </div>
   );
