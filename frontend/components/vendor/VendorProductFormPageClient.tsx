@@ -45,6 +45,12 @@ const emptyDraft: ProductFormDraft = {
 
 const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGES = 6;
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
 
 export function VendorProductForm({
   categories,
@@ -103,8 +109,8 @@ export function VendorProductForm({
       const uploadedUrls: string[] = [];
 
       for (const file of selectedFiles) {
-        if (!file.type.startsWith("image/")) {
-          throw new Error("Please select image files only.");
+        if (!isSupportedImageFile(file)) {
+          throw new Error("Only PNG, JPG, JPEG, WEBP, or GIF images are supported.");
         }
 
         if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
@@ -112,13 +118,18 @@ export function VendorProductForm({
         }
 
         const response = await api.vendors.products.uploadImage(file);
-        uploadedUrls.push(response.url);
+        uploadedUrls.push(normalizeImageUrlForPayload(response.url));
       }
 
-      setDraft((current) => ({
-        ...current,
-        imageUrls: [...current.imageUrls, ...uploadedUrls],
-      }));
+      setDraft((current) => {
+        const mergedUrls = [...current.imageUrls, ...uploadedUrls];
+        const uniqueUrls = mergedUrls.filter((url, index) => mergedUrls.indexOf(url) === index);
+
+        return {
+          ...current,
+          imageUrls: uniqueUrls,
+        };
+      });
     } catch (error) {
       setMessage({
         text: getImageUploadError(error),
@@ -383,6 +394,8 @@ function ImagePickerEditor({
   onRemove: (index: number) => void;
 }) {
   const filePickerRef = useRef<HTMLInputElement | null>(null);
+  const primaryImageUrl = imageUrls[0];
+  const galleryImageUrls = imageUrls.slice(1);
 
   function openFilePicker() {
     filePickerRef.current?.click();
@@ -401,75 +414,88 @@ function ImagePickerEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="vendor-title text-sm font-bold">Images</p>
-        <Button
-          className="vendor-secondary-action h-9 px-3 text-xs"
-          disabled={isUploading || imageUrls.length >= MAX_IMAGES}
-          onClick={openFilePicker}
-          type="button"
-          variant="secondary"
-        >
-          {isUploading ? "Uploading" : "Add photo"}
-        </Button>
-      </div>
+      <p className="vendor-title text-sm font-bold">Images</p>
 
-      <button
-        className="vendor-upload-zone flex aspect-square w-full max-w-[170px] items-center justify-center overflow-hidden rounded-lg border border-dashed transition focus-visible:outline-none focus-visible:ring-2"
-        disabled={isUploading}
-        onClick={openFilePicker}
-        type="button"
-      >
-        {imageUrls[0] ? (
-          <img
-            alt="Primary product preview"
-            className="h-full w-full object-cover"
-            src={imageUrls[0]}
-          />
-        ) : (
-          <span className="vendor-accent-text px-2 text-center text-xs font-bold">
-            Click to add photos
-            <br />
-            PNG JPG WEBP GIF
-          </span>
-        )}
-      </button>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="vendor-image-cell relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-dashed">
+          <button
+            className="flex h-full w-full items-center justify-center bg-transparent transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/25"
+            disabled={isUploading}
+            onClick={openFilePicker}
+            type="button"
+          >
+            {primaryImageUrl ? (
+              <img
+                alt="Primary product preview"
+                className="h-full w-full object-cover"
+                src={primaryImageUrl}
+              />
+            ) : (
+              <span className="px-2 text-center text-xs">
+                <span className="vendor-title block font-semibold">Click to add photos</span>
+                <span className="vendor-muted block font-medium">PNG JPG WEBP GIF</span>
+              </span>
+            )}
+          </button>
+          {primaryImageUrl ? (
+            <button
+              aria-label="Remove image 1"
+              className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/75 text-xs font-bold text-white transition hover:bg-slate-950"
+              onClick={() => onRemove(0)}
+              type="button"
+            >
+              x
+            </button>
+          ) : null}
+        </div>
 
-      {imageUrls.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {imageUrls.map((url, index) => (
+        {galleryImageUrls.map((url, index) => {
+          const imageIndex = index + 1;
+
+          return (
             <div
               className="vendor-image-cell relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border"
-              key={`${url}-${index}`}
+              key={`${url}-${imageIndex}`}
             >
-              <img alt={`Product preview ${index + 1}`} className="h-full w-full object-cover" src={url} />
               <button
-                aria-label={`Remove image ${index + 1}`}
+                aria-label={`Add more photos from image ${imageIndex + 1}`}
+                className="h-full w-full"
+                disabled={isUploading}
+                onClick={openFilePicker}
+                type="button"
+              >
+                <img alt={`Product preview ${imageIndex + 1}`} className="h-full w-full object-cover" src={url} />
+              </button>
+              <button
+                aria-label={`Remove image ${imageIndex + 1}`}
                 className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/75 text-xs font-bold text-white transition hover:bg-slate-950"
-                onClick={() => onRemove(index)}
+                onClick={() => onRemove(imageIndex)}
                 type="button"
               >
                 x
               </button>
             </div>
-          ))}
-          {imageUrls.length < MAX_IMAGES ? (
+          );
+        })}
+
+        {imageUrls.length < MAX_IMAGES ? (
+          <div className="vendor-image-cell flex aspect-square items-center justify-center rounded-lg border border-dashed">
             <button
-              className="vendor-upload-zone flex aspect-square items-center justify-center rounded-lg border border-dashed text-xs font-bold"
+              className="h-full w-full text-xs font-semibold transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/25"
               disabled={isUploading}
               onClick={openFilePicker}
               type="button"
             >
-              + Add photo
+              <span className="vendor-accent-text">+ Add photo</span>
             </button>
-          ) : null}
-        </div>
-      ) : null}
+          </div>
+        ) : null}
+      </div>
 
       <p className="text-xs text-slate-500">Up to {MAX_IMAGES} images, max 5MB each.</p>
 
       <input
-        accept="image/*"
+        accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif"
         className="hidden"
         multiple
         onChange={handleFileChange}
@@ -581,14 +607,6 @@ function ProductStatusBadge({ status }: { status?: Product["status"] }) {
     );
   }
 
-  if (status === "APPROVED") {
-    return (
-      <Badge className="bg-blue-50 text-blue-700" tone="neutral">
-        Approved
-      </Badge>
-    );
-  }
-
   if (status === "REJECTED") {
     return (
       <Badge className="vendor-status-danger" tone="neutral">
@@ -625,7 +643,9 @@ function toPayload(draft: ProductFormDraft): VendorProductPayload {
   return {
     categoryId: draft.categoryId,
     description: draft.description.trim() || undefined,
-    imageUrls: draft.imageUrls.map((url) => url.trim()).filter(Boolean),
+    imageUrls: draft.imageUrls
+      .map((url) => normalizeImageUrlForPayload(url))
+      .filter(Boolean),
     name: draft.name.trim(),
     price: Number(draft.price),
     stockQuantity: Number(draft.stockQuantity),
@@ -665,6 +685,42 @@ function getImageUploadError(error: unknown) {
   }
 
   return "Could not upload image.";
+}
+
+function isSupportedImageFile(file: File) {
+  const normalizedType = file.type.toLowerCase();
+
+  if (ALLOWED_IMAGE_MIME_TYPES.has(normalizedType)) {
+    return true;
+  }
+
+  return /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+}
+
+function normalizeImageUrlForPayload(url: string) {
+  const trimmed = url.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.startsWith("data:image/")) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("/api/uploads/product-images/")) {
+    return trimmed;
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (typeof window !== "undefined") {
+    return new URL(trimmed, window.location.origin).toString();
+  }
+
+  return trimmed;
 }
 
 function getProductFormError(error: unknown, fallback: string) {

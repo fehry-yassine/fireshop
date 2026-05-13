@@ -1,5 +1,17 @@
 export type MoneyValue = number | string;
 
+export type Pagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type PaginatedResponse<T> = {
+  items: T[];
+  pagination: Pagination;
+};
+
 export type UserRole = "BUYER" | "VENDOR" | "ADMIN";
 export type VendorStatus = "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
 
@@ -43,8 +55,43 @@ export type Category = {
   parentId?: string | null;
   isActive?: boolean;
   children?: Category[];
+  parent?: Category | null;
+  _count?: {
+    children?: number;
+    products?: number;
+  };
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type HomepagePromoType = "PROMO_CARD" | "HERO_SLIDE";
+
+export type HomepagePromo = {
+  id: string;
+  type: HomepagePromoType;
+  title: string;
+  subtitle?: string | null;
+  imageUrl?: string | null;
+  linkUrl: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type HomepagePromoPayload = {
+  type: HomepagePromoType;
+  title: string;
+  subtitle?: string | null;
+  imageUrl?: string | null;
+  linkUrl: string;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type PublicHomepagePromos = {
+  promoCards: HomepagePromo[];
+  heroSlides: HomepagePromo[];
 };
 
 export type ProductImage = {
@@ -69,7 +116,6 @@ export type Product = {
   status:
     | "DRAFT"
     | "PENDING_REVIEW"
-    | "APPROVED"
     | "PUBLISHED"
     | "REJECTED"
     | "ARCHIVED";

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { SlideOver } from "@/components/ui/SlideOver";
+import { DashboardDrawer } from "@/components/dashboard/DashboardDrawer";
 import { VendorAccessGate } from "@/components/vendor/VendorAccessGate";
 import { VendorDashboardFrame } from "@/components/vendor/VendorDashboardFrame";
 import { VendorProductForm } from "@/components/vendor/VendorProductFormPageClient";
@@ -18,7 +18,6 @@ import type { Category, Product } from "@/types";
 type ProductStatusFilter =
   | "ALL"
   | "DRAFT"
-  | "APPROVED"
   | "PUBLISHED"
   | "PENDING_REVIEW"
   | "REJECTED"
@@ -254,7 +253,6 @@ function VendorProductsContent() {
               <option value="ALL">All statuses</option>
               <option value="DRAFT">Draft</option>
               <option value="PENDING_REVIEW">Pending review</option>
-              <option value="APPROVED">Approved</option>
               <option value="PUBLISHED">Published</option>
               <option value="REJECTED">Rejected</option>
               <option value="ARCHIVED">Archived</option>
@@ -321,10 +319,13 @@ function VendorProductsContent() {
         product={archiveCandidate}
       />
 
-      <SlideOver
-        ariaLabel={panelState?.mode === "edit" ? "Edit product" : "Create product"}
-        isOpen={panelState !== null}
+      <DashboardDrawer
+        description="Create and update product details, inventory, pricing, images, and publish state."
+        eyebrow="Product editor"
         onClose={() => setPanelState(null)}
+        open={panelState !== null}
+        title={panelState?.mode === "edit" ? "Edit product" : "Create product"}
+        width="xl"
       >
         {panelState ? (
           <VendorProductForm
@@ -335,7 +336,7 @@ function VendorProductsContent() {
             product={panelState.mode === "edit" ? panelState.product : null}
           />
         ) : null}
-      </SlideOver>
+      </DashboardDrawer>
     </div>
   );
 }
@@ -501,14 +502,6 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
     return (
       <Badge className="vendor-status-warning" tone="neutral">
         Pending review
-      </Badge>
-    );
-  }
-
-  if (status === "APPROVED") {
-    return (
-      <Badge className="bg-blue-50 text-blue-700" tone="neutral">
-        Approved
       </Badge>
     );
   }

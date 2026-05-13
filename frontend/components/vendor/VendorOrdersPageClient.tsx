@@ -4,8 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
+  ORDER_STATUS_OPTIONS,
   formatOrderStatus,
+  getOrderStatusEffectNote,
+  getOrderStatusMeaning,
+  getOrderStatusOptions,
 } from "@/components/orders/OrderStatus";
+import { DashboardDrawer } from "@/components/dashboard/DashboardDrawer";
 import { VendorAccessGate } from "@/components/vendor/VendorAccessGate";
 import { VendorDashboardFrame } from "@/components/vendor/VendorDashboardFrame";
 import { Button } from "@/components/ui/Button";
@@ -46,24 +51,6 @@ const TAB_ITEMS = [
 ] as const;
 
 type OrdersTab = (typeof TAB_ITEMS)[number]["value"];
-
-const VENDOR_STATUS_OPTIONS: OrderStatus[] = [
-  "PENDING",
-  "CONFIRMED",
-  "SHIPPED",
-  "DELIVERED",
-  "RETURNED",
-  "CANCELLED",
-];
-
-const VENDOR_STATUS_FLOW: Record<OrderStatus, OrderStatus[]> = {
-  PENDING: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["SHIPPED", "CANCELLED"],
-  SHIPPED: ["DELIVERED", "RETURNED"],
-  DELIVERED: [],
-  RETURNED: [],
-  CANCELLED: [],
-};
 
 export function VendorOrdersPageClient() {
   return (
@@ -628,6 +615,17 @@ function OrderDrawer({
     : 0;
   const orderShortId = order ? shortOrderId(order.id) : "--";
   const orderNumericId = order ? shortNumericId(order.id) : "--";
+  const statusChanged = order ? form.status !== order.status : true;
+  const drawerEyebrow = isCreateMode
+    ? "Order creator"
+    : isEditableMode
+      ? "Order editor"
+      : "Order management";
+  const drawerTitle = isCreateMode
+    ? "Add new order"
+    : isEditableMode
+      ? `Edit order No.${orderNumericId}`
+      : `Order ${orderShortId}`;
 
   if (!isCreateMode && !order) {
     return null;
@@ -638,310 +636,299 @@ function OrderDrawer({
   }
 
   return (
-    <div aria-modal="true" className="fixed inset-0 z-50" role="dialog">
-      <button
-        aria-label="Close order drawer"
-        className="absolute inset-0 h-full w-full bg-slate-950/50"
-        onClick={onClose}
-        type="button"
-      />
-      <aside className="vendor-editor fixed right-0 top-0 z-50 flex h-full w-full min-h-0 flex-col overflow-hidden shadow-2xl lg:w-[78vw] xl:w-[72vw] xl:max-w-[1180px]">
-        <div className="vendor-topbar sticky top-0 z-20 flex min-h-20 items-center justify-between gap-4 border-b px-6">
-          <div>
-            <p className="vendor-muted text-xs font-bold uppercase tracking-wide">
-              {isCreateMode ? "Order creator" : isEditableMode ? "Order editor" : "Order view"}
-            </p>
-            <h2 className="vendor-title text-xl font-bold">
-              {isCreateMode
-                ? "Add new order"
-                : isEditableMode
-                  ? `Edit order No.${orderNumericId}`
-                  : `Order ${orderShortId}`}
-            </h2>
-          </div>
-          <div className="flex items-center gap-3">
-            {isEditableMode ? (
-              <Button
-                className="vendor-primary-action h-12 rounded-xl px-5"
-                disabled={isSaving}
-                onClick={onSave}
-              >
-                <SaveIcon className="h-4 w-4" />
-                {isSaving ? "Saving" : isCreateMode ? "Create order" : "Save"}
-              </Button>
-            ) : null}
-            <button
-              aria-label="Close drawer"
-              className="vendor-icon-button inline-flex h-10 w-10 items-center justify-center rounded-lg border transition"
+    <DashboardDrawer
+      description="Manage customer details, order status, notes, and fulfillment context."
+      eyebrow={drawerEyebrow}
+      footer={
+        isEditableMode ? (
+          <div className="flex justify-end gap-3">
+            <Button
+              className="vendor-secondary-action h-11 rounded-xl px-5"
+              disabled={isSaving}
               onClick={onClose}
-              type="button"
+              variant="secondary"
             >
-              <CloseIcon className="h-5 w-5" />
-            </button>
+              Cancel
+            </Button>
+            <Button
+              className="vendor-primary-action h-11 rounded-xl px-5"
+              disabled={isSaving}
+              onClick={onSave}
+            >
+              <SaveIcon className="h-4 w-4" />
+              {isSaving ? "Saving" : isCreateMode ? "Create order" : "Save"}
+            </Button>
           </div>
-        </div>
+        ) : null
+      }
+      onClose={onClose}
+      open
+      title={drawerTitle}
+      width="xl"
+    >
+      <div className="bg-slate-50">
+        {message ? (
+          <p
+            className={cn(
+              "mb-5 rounded-xl border px-4 py-3 text-sm font-semibold",
+              message.tone === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-red-200 bg-red-50 text-red-700",
+            )}
+          >
+            {message.text}
+          </p>
+        ) : null}
 
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6">
-          {message ? (
-            <p
-              className={cn(
-                "mb-5 rounded-xl border px-4 py-3 text-sm font-semibold",
-                message.tone === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-red-200 bg-red-50 text-red-700",
-              )}
+        {isEditableMode ? (
+          <div className="space-y-5">
+            <DrawerSection
+              action={
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <input className="h-5 w-5 rounded border-slate-300" disabled type="checkbox" />
+                  Exchange
+                </label>
+              }
+              title="Order Details"
             >
-              {message.text}
-            </p>
-          ) : null}
-
-          {isEditableMode ? (
-            <div className="space-y-5">
-              <DrawerSection
-                action={
-                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <input className="h-5 w-5 rounded border-slate-300" disabled type="checkbox" />
-                    Exchange
-                  </label>
-                }
-                title="Order Details"
-              >
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <Field label="Status">
-                    <StatusPicker
-                      onChange={(value) => updateFormField("status", value as OrderStatus)}
-                      restrictToFlow={!isCreateMode}
-                      value={form.status}
-                    />
-                  </Field>
-                  <Field label="Delivery Company">
-                    <select className={inputClassName} disabled value="-">
-                      <option>-</option>
-                    </select>
-                  </Field>
-                </div>
-                <Field label="Add a private note">
-                  <textarea
-                    className={`${textareaClassName} h-20`}
-                    placeholder="Add a private note"
-                    onChange={(event) => updateFormField("notes", event.target.value)}
-                    value={form.notes}
-                  />
-                </Field>
-              </DrawerSection>
-
-              <DrawerSection
-                action={
-                  <button
-                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900"
-                    disabled
-                    type="button"
-                  >
-                    <BanIcon className="h-4 w-4" />
-                    Customer Spam Check
-                  </button>
-                }
-                title="Customer Details"
-              >
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <Field label="Name">
-                    <input
-                      className={inputClassName}
-                      onChange={(event) => updateFormField("fullName", event.target.value)}
-                      value={form.fullName}
-                    />
-                  </Field>
-                  <Field label="Phone">
-                    <input
-                      className={inputClassName}
-                      onChange={(event) => updateFormField("phone", event.target.value)}
-                      value={form.phone}
-                    />
-                  </Field>
-                  <Field label="Address">
-                    <input
-                      className={inputClassName}
-                      onChange={(event) => updateFormField("address", event.target.value)}
-                      value={form.address}
-                    />
-                  </Field>
-                  <Field label="City">
-                    <input
-                      className={inputClassName}
-                      onChange={(event) => updateFormField("city", event.target.value)}
-                      value={form.city}
-                    />
-                  </Field>
-                  <Field label="Governorate">
-                    <input
-                      className={inputClassName}
-                      onChange={(event) => updateFormField("governorate", event.target.value)}
-                      value={form.governorate}
-                    />
-                  </Field>
-                  <Field label="Postal code">
-                    <input
-                      className={inputClassName}
-                      onChange={(event) => updateFormField("postalCode", event.target.value)}
-                      value={form.postalCode}
-                    />
-                  </Field>
-                </div>
-                <Field label="Note">
-                  <textarea
-                    className={`${textareaClassName} h-20`}
-                    placeholder="Enter any additional notes"
-                    onChange={(event) => updateFormField("notes", event.target.value)}
-                    value={form.notes}
-                  />
-                </Field>
-              </DrawerSection>
-
               <div className="grid gap-4 lg:grid-cols-2">
-                <Field label="Select a product">
-                  <select
-                    className={inputClassName}
-                    disabled={!isCreateMode}
-                    onChange={(event) => updateFormField("productId", event.target.value)}
-                    value={form.productId}
-                  >
-                    <option value="">Choose product</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
+                <Field label="Status">
+                  <StatusPicker
+                    flowStatus={order?.status}
+                    onChange={(value) => updateFormField("status", value as OrderStatus)}
+                    restrictToFlow={!isCreateMode}
+                    value={form.status}
+                  />
+                  <StatusGuidance status={form.status} />
+                </Field>
+                <Field label="Delivery Company">
+                  <select className={inputClassName} disabled value="-">
+                    <option>-</option>
                   </select>
                 </Field>
-                <Field label="Quantity">
+              </div>
+              <Field label="Add a private note">
+                <textarea
+                  className={`${textareaClassName} h-20`}
+                  placeholder="Add a private note"
+                  onChange={(event) => updateFormField("notes", event.target.value)}
+                  value={form.notes}
+                />
+              </Field>
+            </DrawerSection>
+
+            <DrawerSection
+              action={
+                <button
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900"
+                  disabled
+                  type="button"
+                >
+                  <BanIcon className="h-4 w-4" />
+                  Customer Spam Check
+                </button>
+              }
+              title="Customer Details"
+            >
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Field label="Name">
                   <input
                     className={inputClassName}
-                    disabled={!isCreateMode}
-                    inputMode="numeric"
-                    min={1}
-                    onChange={(event) => updateFormField("quantity", event.target.value)}
-                    type="number"
-                    value={form.quantity}
+                    onChange={(event) => updateFormField("fullName", event.target.value)}
+                    value={form.fullName}
+                  />
+                </Field>
+                <Field label="Phone">
+                  <input
+                    className={inputClassName}
+                    onChange={(event) => updateFormField("phone", event.target.value)}
+                    value={form.phone}
+                  />
+                </Field>
+                <Field label="Address">
+                  <input
+                    className={inputClassName}
+                    onChange={(event) => updateFormField("address", event.target.value)}
+                    value={form.address}
+                  />
+                </Field>
+                <Field label="City">
+                  <input
+                    className={inputClassName}
+                    onChange={(event) => updateFormField("city", event.target.value)}
+                    value={form.city}
+                  />
+                </Field>
+                <Field label="Governorate">
+                  <input
+                    className={inputClassName}
+                    onChange={(event) => updateFormField("governorate", event.target.value)}
+                    value={form.governorate}
+                  />
+                </Field>
+                <Field label="Postal code">
+                  <input
+                    className={inputClassName}
+                    onChange={(event) => updateFormField("postalCode", event.target.value)}
+                    value={form.postalCode}
                   />
                 </Field>
               </div>
+              <Field label="Note">
+                <textarea
+                  className={`${textareaClassName} h-20`}
+                  placeholder="Enter any additional notes"
+                  onChange={(event) => updateFormField("notes", event.target.value)}
+                  value={form.notes}
+                />
+              </Field>
+            </DrawerSection>
 
-              {order ? (
-                <OrderSummarySection order={order} />
-              ) : (
-                <DrawerSection title="Order Summary">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <DetailRow label="Product" value={selectedProduct?.name ?? "-"} />
-                    <DetailRow label="Quantity" value={form.quantity || "0"} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Field label="Select a product">
+                <select
+                  className={inputClassName}
+                  disabled={!isCreateMode}
+                  onChange={(event) => updateFormField("productId", event.target.value)}
+                  value={form.productId}
+                >
+                  <option value="">Choose product</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Quantity">
+                <input
+                  className={inputClassName}
+                  disabled={!isCreateMode}
+                  inputMode="numeric"
+                  min={1}
+                  onChange={(event) => updateFormField("quantity", event.target.value)}
+                  type="number"
+                  value={form.quantity}
+                />
+              </Field>
+            </div>
+
+            {order ? (
+              <OrderSummarySection order={order} />
+            ) : (
+              <DrawerSection title="Order Summary">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <DetailRow label="Product" value={selectedProduct?.name ?? "-"} />
+                  <DetailRow label="Quantity" value={form.quantity || "0"} />
+                </div>
+                <div className="mt-4 flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3">
+                  <span className="font-bold text-orange-700">Estimated total</span>
+                  <span className="font-bold text-slate-950">{formatTnd(estimatedTotal)}</span>
+                </div>
+              </DrawerSection>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-3">
+                  <VendorStatusPill status={order!.status} />
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-950">{shortOrderId(order!.id)}</h3>
+                    <p className="mt-1 text-sm text-slate-500">{formatDateTime(order!.createdAt)}</p>
                   </div>
-                  <div className="mt-4 flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3">
-                    <span className="font-bold text-orange-700">Estimated total</span>
-                    <span className="font-bold text-slate-950">{formatTnd(estimatedTotal)}</span>
+                  <p className="text-sm font-semibold text-slate-700">
+                    {order!.shipping.fullName} / {order!.shipping.phone}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-orange-50 px-5 py-4 text-right">
+                  <p className="text-sm font-semibold text-orange-700">Total</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-950">
+                    {formatTnd(order!.total)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="space-y-5">
+                <DrawerSection title="Order items">
+                  <div className="divide-y divide-slate-200">
+                    {order!.items.map((item) => (
+                      <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0" key={item.id}>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <ProductThumb
+                            imageUrl={item.productImage?.url}
+                            label={item.productImage?.altText ?? item.productName}
+                          />
+                          <div className="min-w-0">
+                            <Link
+                              className="font-semibold text-slate-950 hover:text-orange-700"
+                              href={`/product/${item.productSlug}`}
+                            >
+                              {item.productName}
+                            </Link>
+                            <p className="text-xs text-slate-500">
+                              Qty {item.quantity} / {formatTnd(item.unitPrice)}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="font-bold text-slate-950">{formatTnd(item.subtotal)}</p>
+                      </div>
+                    ))}
                   </div>
                 </DrawerSection>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-3">
-                    <VendorStatusPill status={order!.status} />
-                    <div>
-                      <h3 className="text-2xl font-bold text-slate-950">{shortOrderId(order!.id)}</h3>
-                      <p className="mt-1 text-sm text-slate-500">{formatDateTime(order!.createdAt)}</p>
-                    </div>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {order!.shipping.fullName} / {order!.shipping.phone}
-                    </p>
+
+                <DrawerSection title="Update status">
+                  <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <Field label="Status">
+                      <StatusPicker
+                        flowStatus={order!.status}
+                        onChange={(value) => updateFormField("status", value as OrderStatus)}
+                        restrictToFlow
+                        value={form.status}
+                      />
+                      <StatusGuidance status={form.status} />
+                    </Field>
+                    <Button
+                      className="vendor-primary-action h-12 rounded-xl px-5"
+                      disabled={isSaving || !statusChanged}
+                      onClick={onSave}
+                    >
+                      {isSaving ? "Saving" : "Save status"}
+                    </Button>
                   </div>
-                  <div className="rounded-xl bg-orange-50 px-5 py-4 text-right">
-                    <p className="text-sm font-semibold text-orange-700">Total</p>
-                    <p className="mt-1 text-2xl font-extrabold text-slate-950">
-                      {formatTnd(order!.total)}
-                    </p>
-                  </div>
-                </div>
+                </DrawerSection>
               </div>
 
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-                <div className="space-y-5">
-                  <DrawerSection title="Order items">
-                    <div className="divide-y divide-slate-200">
-                      {order!.items.map((item) => (
-                        <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0" key={item.id}>
-                          <div className="flex min-w-0 items-center gap-3">
-                            <ProductThumb
-                              imageUrl={item.productImage?.url}
-                              label={item.productImage?.altText ?? item.productName}
-                            />
-                            <div className="min-w-0">
-                              <Link
-                                className="font-semibold text-slate-950 hover:text-orange-700"
-                                href={`/product/${item.productSlug}`}
-                              >
-                                {item.productName}
-                              </Link>
-                              <p className="text-xs text-slate-500">
-                                Qty {item.quantity} / {formatTnd(item.unitPrice)}
-                              </p>
-                            </div>
-                          </div>
-                          <p className="font-bold text-slate-950">{formatTnd(item.subtotal)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </DrawerSection>
+              <div className="space-y-5">
+                <DrawerSection title="Customer details">
+                  <DetailRow label="Name" value={order!.shipping.fullName} />
+                  <DetailRow label="Phone" value={order!.shipping.phone} />
+                  <DetailRow label="City" value={order!.shipping.city} />
+                  <DetailRow label="Email" value={order!.buyer?.email ?? "-"} />
+                </DrawerSection>
 
-                  <DrawerSection title="Update status">
-                    <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                      <Field label="Status">
-                        <StatusPicker
-                          onChange={(value) => updateFormField("status", value as OrderStatus)}
-                          restrictToFlow
-                          value={form.status}
-                        />
-                      </Field>
-                      <Button
-                        className="vendor-primary-action h-12 rounded-xl px-5"
-                        disabled={isSaving}
-                        onClick={onSave}
-                      >
-                        {isSaving ? "Saving" : "Save status"}
-                      </Button>
-                    </div>
-                  </DrawerSection>
-                </div>
+                <DrawerSection title="Delivery address">
+                  <p className="text-sm leading-6 text-slate-700">{formatAddress(order!)}</p>
+                </DrawerSection>
 
-                <div className="space-y-5">
-                  <DrawerSection title="Customer details">
-                    <DetailRow label="Name" value={order!.shipping.fullName} />
-                    <DetailRow label="Phone" value={order!.shipping.phone} />
-                    <DetailRow label="City" value={order!.shipping.city} />
-                    <DetailRow label="Email" value={order!.buyer?.email ?? "-"} />
-                  </DrawerSection>
-
-                  <DrawerSection title="Delivery address">
-                    <p className="text-sm leading-6 text-slate-700">{formatAddress(order!)}</p>
-                  </DrawerSection>
-
-                  <DrawerSection title="Summary">
-                    <DetailRow label="Subtotal" value={formatTnd(order!.subtotal)} />
-                    <DetailRow label="Delivery" value={formatTnd(order!.deliveryFee)} />
-                    <DetailRow label="Items" value={`${itemCount}`} />
-                    <div className="mt-4 flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3">
-                      <span className="font-bold text-orange-700">Total</span>
-                      <span className="font-extrabold text-slate-950">{formatTnd(order!.total)}</span>
-                    </div>
-                  </DrawerSection>
-                </div>
+                <DrawerSection title="Summary">
+                  <DetailRow label="Subtotal" value={formatTnd(order!.subtotal)} />
+                  <DetailRow label="Delivery" value={formatTnd(order!.deliveryFee)} />
+                  <DetailRow label="Items" value={`${itemCount}`} />
+                  <div className="mt-4 flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3">
+                    <span className="font-bold text-orange-700">Total</span>
+                    <span className="font-extrabold text-slate-950">{formatTnd(order!.total)}</span>
+                  </div>
+                </DrawerSection>
               </div>
             </div>
-          )}
-        </div>
-
-      </aside>
-    </div>
+          </div>
+        )}
+      </div>
+    </DashboardDrawer>
   );
 }
 
@@ -1053,6 +1040,19 @@ function Field({ children, label }: { children: ReactNode; label: string }) {
   );
 }
 
+function StatusGuidance({ status }: { status: OrderStatus }) {
+  const effectNote = getOrderStatusEffectNote(status);
+
+  return (
+    <div className="space-y-1 text-xs">
+      <p className="font-medium text-slate-500">{getOrderStatusMeaning(status)}</p>
+      {effectNote ? (
+        <p className="font-semibold text-slate-700">{effectNote}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function TableMessage({ colSpan, text }: { colSpan: number; text: string }) {
   return (
     <tr>
@@ -1145,20 +1145,26 @@ function VendorStatusPill({ status }: { status: OrderStatus }) {
 function StatusPicker({
   allowAll = false,
   className,
+  flowStatus,
   onChange,
   restrictToFlow = false,
   value,
 }: {
   allowAll?: boolean;
   className?: string;
+  flowStatus?: OrderStatus;
   onChange: (value: OrderStatus | "ALL") => void;
   restrictToFlow?: boolean;
   value: OrderStatus | "ALL";
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const statusFlowAnchor = flowStatus ?? (isOrderStatus(value) ? value : undefined);
   const statusOptions =
-    restrictToFlow && isOrderStatus(value) ? getVendorStatusOptions(value) : VENDOR_STATUS_OPTIONS;
+    restrictToFlow && statusFlowAnchor
+      ? getOrderStatusOptions(statusFlowAnchor)
+      : ORDER_STATUS_OPTIONS;
+  const isDisabled = !allowAll && restrictToFlow && statusOptions.length <= 1;
 
   useEffect(() => {
     function handleOutside(event: MouseEvent) {
@@ -1179,8 +1185,13 @@ function StatusPicker({
     <div className={cn("relative w-full", className)} ref={rootRef}>
       <button
         aria-expanded={isOpen}
-        className="inline-flex h-12 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-700 outline-none transition hover:border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/15"
-        onClick={() => setIsOpen((current) => !current)}
+        className="inline-flex h-12 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-700 outline-none transition hover:border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/15 disabled:bg-slate-50 disabled:text-slate-500"
+        disabled={isDisabled}
+        onClick={() => {
+          if (!isDisabled) {
+            setIsOpen((current) => !current);
+          }
+        }}
         type="button"
       >
         {value === "ALL" ? (
@@ -1247,14 +1258,6 @@ function getStatusToneClass(status: OrderStatus) {
   };
 
   return classes[status];
-}
-
-function getVendorStatusOptions(currentStatus?: OrderStatus) {
-  if (!currentStatus) {
-    return VENDOR_STATUS_OPTIONS;
-  }
-
-  return Array.from(new Set([currentStatus, ...(VENDOR_STATUS_FLOW[currentStatus] ?? [])]));
 }
 
 function isOrderStatus(value: OrderStatus | "ALL"): value is OrderStatus {

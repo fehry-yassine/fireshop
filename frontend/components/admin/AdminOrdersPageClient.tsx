@@ -11,9 +11,12 @@ import {
   shortId,
 } from "@/components/admin/adminUtils";
 import {
-  ORDER_STATUS_OPTIONS,
   OrderStatusBadge,
   formatOrderStatus,
+  getOrderStatusEffectNote,
+  getOrderStatusMeaning,
+  getOrderStatusOptions,
+  isFinalOrderStatus,
 } from "@/components/orders/OrderStatus";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -80,9 +83,7 @@ function AdminOrdersContent() {
 
   const openOrders = useMemo(
     () =>
-      orders.filter(
-        (order) => order.status !== "DELIVERED" && order.status !== "CANCELLED",
-      ),
+      orders.filter((order) => !isFinalOrderStatus(order.status)),
     [orders],
   );
 
@@ -95,6 +96,17 @@ function AdminOrdersContent() {
 
   async function updateStatus(order: Order) {
     const nextStatus = selectedStatuses[order.id] ?? order.status;
+    const allowedStatuses = getOrderStatusOptions(order.status);
+
+    if (!allowedStatuses.includes(nextStatus)) {
+      setMessage({
+        orderId: order.id,
+        text: `Order cannot move from ${formatOrderStatus(order.status)} to ${formatOrderStatus(nextStatus)}.`,
+        tone: "error",
+      });
+      return;
+    }
+
     setActiveOrderId(order.id);
     setMessage(null);
 
@@ -195,7 +207,13 @@ function AdminOrderCard({
   selectedStatus: OrderStatus;
 }) {
   const isUpdating = activeOrderId === order.id;
-  const statusChanged = selectedStatus !== order.status;
+  const statusOptions = getOrderStatusOptions(order.status);
+  const safeSelectedStatus = statusOptions.includes(selectedStatus)
+    ? selectedStatus
+    : order.status;
+  const statusChanged = safeSelectedStatus !== order.status;
+  const effectNote = getOrderStatusEffectNote(safeSelectedStatus);
+  const canChangeStatus = statusOptions.length > 1;
 
   return (
     <Card>
@@ -262,17 +280,24 @@ function AdminOrderCard({
               Update status
             </label>
             <select
-              className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
+              className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15 disabled:bg-slate-50 disabled:text-slate-500"
+              disabled={!canChangeStatus}
               id={`status-${order.id}`}
               onChange={(event) => onStatusChange(event.target.value as OrderStatus)}
-              value={selectedStatus}
+              value={safeSelectedStatus}
             >
-              {ORDER_STATUS_OPTIONS.map((status) => (
+              {statusOptions.map((status) => (
                 <option key={status} value={status}>
                   {formatOrderStatus(status)}
                 </option>
               ))}
             </select>
+            <p className="text-xs font-medium text-slate-500">
+              {getOrderStatusMeaning(safeSelectedStatus)}
+            </p>
+            {effectNote ? (
+              <p className="text-xs font-semibold text-slate-700">{effectNote}</p>
+            ) : null}
           </div>
           <Button disabled={isUpdating || !statusChanged} onClick={onUpdateStatus}>
             {isUpdating ? "Updating" : "Update"}

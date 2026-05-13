@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Category } from "@/types";
+import { categoryRoute } from "@/lib/categoryRoutes";
 import { cn } from "@/lib/utils";
 
 const fallbackCategories: Array<Pick<Category, "id" | "name" | "slug">> = [
@@ -40,7 +41,7 @@ export function CategorySidebar({ categories, activeSlug }: CategorySidebarProps
               "block min-w-max rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2 lg:min-w-0",
               activeSlug === category.slug && "bg-market-50 text-market-800",
             )}
-            href={`/?category=${category.slug}`}
+            href={categoryRoute(category.slug)}
             key={category.id}
           >
             {category.name}

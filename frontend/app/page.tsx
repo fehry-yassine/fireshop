@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { HomeDiscoveryHero } from "@/components/home/HomeDiscoveryHero";
+import { HomeProductImage } from "@/components/product/HomeProductImage";
 import { Container } from "@/components/ui/Container";
 import { api } from "@/lib/api";
 import { formatTnd } from "@/lib/format";
@@ -6,41 +9,36 @@ import type { Category, Product } from "@/types";
 type HomePageProps = {
   searchParams?: Promise<{
     category?: string | string[];
+    q?: string | string[];
   }>;
 };
 
-const heroImages = [
-  "https://images.unsplash.com/photo-1542291026-7eec264c27ff",
-  "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9",
-  "https://images.unsplash.com/photo-1523275335684-37898b6baf30",
-  "https://images.unsplash.com/photo-1503602642458-232111445657",
-];
-
-const offerImages = [
-  "https://images.unsplash.com/photo-1585386959984-a4155224a1ad",
-  "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
-  "https://images.unsplash.com/photo-1523381210434-271e8be1f52b",
-  "https://images.unsplash.com/photo-1485968579580-b6d095142e6e",
-  "https://images.unsplash.com/photo-1560343090-f0409e92791a",
-  "https://images.unsplash.com/photo-1511497584788-876760111969",
-];
-
-const promoImage =
-  "https://images.unsplash.com/photo-1616627456335-5d9f4f0958f4";
-const quickCustomImage =
-  "https://images.unsplash.com/photo-1612196808214-b8e1d6145a05";
+type SectionHeaderProps = {
+  href?: string;
+  subtitle?: string;
+  title: string;
+};
 
 async function getHomeData(categorySlug?: string) {
-  const [categoriesResult, productsResult] = await Promise.allSettled([
-    api.categories.tree(),
-    api.products.list(categorySlug ? { category: categorySlug } : undefined),
-  ]);
+  const [categoriesResult, productsResult, homepagePromosResult] =
+    await Promise.allSettled([
+      api.categories.tree(),
+      api.products.list({
+        ...(categorySlug ? { category: categorySlug } : {}),
+        limit: 60,
+      }),
+      api.homepagePromos.list(),
+    ]);
 
   return {
     categories:
       categoriesResult.status === "fulfilled"
         ? categoriesResult.value
         : ([] as Category[]),
+    homepagePromos:
+      homepagePromosResult.status === "fulfilled"
+        ? homepagePromosResult.value
+        : { promoCards: [], heroSlides: [] },
     products:
       productsResult.status === "fulfilled"
         ? productsResult.value
@@ -48,13 +46,175 @@ async function getHomeData(categorySlug?: string) {
   };
 }
 
-function imageFor(product: Product, fallback: string) {
-  return product.images?.[0]?.url ?? fallback;
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
-function seededIndex(seed: string, length: number) {
+function activeChildren(category?: Category) {
+  return category?.children?.filter((child) => child.isActive !== false) ?? [];
+}
+
+function productMatchesSearch(product: Product, query: string) {
+  if (!query) {
+    return true;
+  }
+
+  const haystack = normalizeSearch(
+    [
+      product.name,
+      product.description,
+      product.category?.name,
+      product.vendor?.storeName,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+
+  return haystack.includes(query);
+}
+
+function newestFirst(products: Product[]) {
+  return [...products].sort((a, b) => {
+    const aDate = new Date(a.createdAt ?? 0).getTime();
+    const bDate = new Date(b.createdAt ?? 0).getTime();
+    return bDate - aDate;
+  });
+}
+
+function priceNumber(product: Product) {
+  return Number(product.offerPrice ?? product.price) || 0;
+}
+
+function SectionHeader({
+  href = "/search",
+  subtitle,
+  title,
+}: SectionHeaderProps) {
   return (
-    seed.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) % length
+    <div className="flex items-start justify-between gap-3 pb-2.5">
+      <div className="min-w-0">
+        <h2 className="text-lg font-extrabold tracking-tight text-slate-950">
+          {title}
+        </h2>
+        {subtitle ? (
+          <p className="mt-0.5 text-sm leading-5 text-slate-500">{subtitle}</p>
+        ) : null}
+      </div>
+      <Link
+        className="mt-1 shrink-0 rounded-full px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-market-50 hover:text-market-800 sm:text-sm"
+        href={href}
+      >
+        En savoir plus {">"}
+      </Link>
+    </div>
+  );
+}
+
+function ProductImage({ product }: { product: Product }) {
+  const image = product.images?.[0];
+
+  return (
+    <HomeProductImage
+      alt={image?.altText ?? product.name}
+      className="transition duration-300 group-hover:scale-[1.03]"
+      productName={product.name}
+      src={image?.url}
+    />
+  );
+}
+
+function CompactProductCard({
+  product,
+  tone = "light",
+}: {
+  product: Product;
+  tone?: "light" | "dark";
+}) {
+  const hasOffer = Boolean(product.offerPrice) || product.isOnOffer;
+
+  return (
+    <Link
+      className="group block h-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2"
+      href={`/product/${product.slug}`}
+    >
+      <article
+        className={
+          tone === "dark"
+            ? "flex h-full flex-col rounded-lg bg-white p-2 text-slate-950 shadow-[0_10px_24px_rgba(15,23,42,0.10)] ring-1 ring-white/80 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.16)]"
+            : "flex h-full flex-col rounded-lg bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.055)] ring-1 ring-slate-900/5 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.10)] hover:ring-market-200/80"
+        }
+      >
+        <div className="aspect-square overflow-hidden rounded-md bg-slate-50 ring-1 ring-slate-900/5">
+          <ProductImage product={product} />
+        </div>
+        <h3
+          className="mt-2 line-clamp-2 min-h-9 break-words text-[13px] font-semibold leading-[18px] text-slate-950"
+          dir="auto"
+        >
+          {product.name}
+        </h3>
+        <div className="mt-auto pt-2">
+          <p className="text-sm font-extrabold leading-5 text-market-800">
+            {formatTnd(product.offerPrice ?? product.price)}
+          </p>
+          {hasOffer ? (
+            <p className="text-xs font-medium leading-4 text-slate-400 line-through">
+              {formatTnd(product.price)}
+            </p>
+          ) : null}
+          <p className="mt-1 truncate text-xs text-slate-500" dir="auto">
+            {product.vendor?.storeName ?? product.category?.name ?? "FireShop"}
+          </p>
+        </div>
+      </article>
+    </Link>
+  );
+}
+
+function MiniProductCard({ product }: { product: Product }) {
+  return (
+    <Link
+      className="group grid min-h-[92px] grid-cols-[72px_minmax(0,1fr)] gap-3 rounded-lg bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.055)] ring-1 ring-slate-900/5 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(15,23,42,0.10)] hover:ring-market-200/80"
+      href={`/product/${product.slug}`}
+    >
+      <div className="aspect-square overflow-hidden rounded-md bg-slate-50 ring-1 ring-slate-900/5">
+        <ProductImage product={product} />
+      </div>
+      <div className="flex min-w-0 flex-col">
+        <p
+          className="line-clamp-2 break-words text-[13px] font-semibold leading-[18px] text-slate-950 group-hover:text-market-800"
+          dir="auto"
+        >
+          {product.name}
+        </p>
+        <div className="mt-auto pt-1">
+          <p className="text-sm font-extrabold leading-5 text-market-800">
+            {formatTnd(product.offerPrice ?? product.price)}
+          </p>
+          <p className="truncate text-xs text-slate-500" dir="auto">
+            {product.vendor?.storeName ?? product.category?.name ?? "Vendeur"}
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function EmptyProducts({ label }: { label: string }) {
+  return (
+    <div className="rounded-xl bg-white/90 px-4 py-7 text-center shadow-[0_8px_22px_rgba(15,23,42,0.05)] ring-1 ring-slate-900/5">
+      <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-2xl bg-market-50 text-xs font-black text-market-800 shadow-sm ring-1 ring-market-100">
+        FS
+      </div>
+      <p className="text-sm font-semibold text-slate-950">{label}</p>
+      <p className="mt-1 text-sm text-slate-500">
+        Les produits approuves et publies apparaitront ici automatiquement.
+      </p>
+    </div>
   );
 }
 
@@ -63,284 +223,115 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const rawCategory = Array.isArray(params?.category)
     ? params?.category[0]
     : params?.category;
-  const categorySlug = rawCategory && rawCategory !== "all" ? rawCategory : undefined;
-  const { categories, products } = await getHomeData(categorySlug);
-  const featuredProducts = products.slice(0, 4);
-  const bestOffers = products.slice(0, 6);
-  const rankedProducts = products.slice(0, 4);
-  const newArrivals = [...products]
+  const rawQuery = Array.isArray(params?.q) ? params?.q[0] : params?.q;
+  const categorySlug =
+    rawCategory && rawCategory !== "all" ? rawCategory : undefined;
+  const searchQuery = rawQuery?.trim() ?? "";
+  const normalizedQuery = normalizeSearch(searchQuery);
+
+  const { categories, homepagePromos, products } = await getHomeData(categorySlug);
+  const mainCategories = categories
+    .filter((category) => !category.parentId && category.isActive !== false)
+    .map((category) => ({
+      ...category,
+      children: activeChildren(category),
+    }));
+  const publishedProducts = products
+    .filter((product) => product.status === "PUBLISHED")
+    .filter((product) => productMatchesSearch(product, normalizedQuery));
+
+  const recentProducts = newestFirst(publishedProducts).slice(0, 6);
+  const trendProducts = publishedProducts.slice(0, 8);
+  const bestOffers = [...publishedProducts]
     .sort((a, b) => {
-      const aDate = new Date(a.createdAt ?? 0).getTime();
-      const bDate = new Date(b.createdAt ?? 0).getTime();
-      return bDate - aDate;
+      const aOffer = a.offerPrice || a.isOnOffer ? 1 : 0;
+      const bOffer = b.offerPrice || b.isOnOffer ? 1 : 0;
+      if (aOffer !== bOffer) {
+        return bOffer - aOffer;
+      }
+
+      return priceNumber(a) - priceNumber(b);
+    })
+    .slice(0, 8);
+  const rankedProducts = [...publishedProducts]
+    .sort((a, b) => {
+      const featuredScore = Number(b.isFeatured) - Number(a.isFeatured);
+      if (featuredScore !== 0) {
+        return featuredScore;
+      }
+
+      return b.stockQuantity - a.stockQuantity;
     })
     .slice(0, 4);
-  const mainCategories = categories
-    .filter((category) => !category.parentId)
-    .slice(0, 10);
-
+  const newArrivals = newestFirst(publishedProducts).slice(0, 4);
   return (
-    <main className="bg-surface-50 pb-10">
-      <section className="border-b border-slate-200 bg-white">
-        <Container className="space-y-4 py-4">
-          <nav className="flex items-center gap-5 overflow-x-auto text-lg font-bold text-slate-900">
-            <a
-              className="whitespace-nowrap border-b-2 border-market-700 pb-2 text-market-800"
-              href="/search"
-            >
-              Recherche
-            </a>
-            <a className="whitespace-nowrap pb-2 hover:text-market-800" href="#produits">
-              Produits
-            </a>
-            <a className="whitespace-nowrap pb-2 hover:text-market-800" href="#fabricants">
-              Fabricants
-            </a>
-            <a className="whitespace-nowrap pb-2 hover:text-market-800" href="#offres">
-              Mondial
-            </a>
-          </nav>
+    <main className="bg-[#f5f6f8] pb-8">
+      <Container className="max-w-[1680px] space-y-4 py-4">
+        <HomeDiscoveryHero
+          activeCategorySlug={categorySlug}
+          categories={mainCategories}
+          heroSlides={homepagePromos.heroSlides}
+          promoCards={homepagePromos.promoCards}
+        />
 
-          <div className="rounded-lg border border-market-300 bg-white p-4 shadow-soft">
-            <form action="/" className="space-y-3" role="search">
-              <div className="grid gap-2 sm:grid-cols-[220px_minmax(0,1fr)_140px]">
-                <select
-                  className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-market-600 focus:ring-2 focus:ring-market-600/20"
-                  defaultValue="all"
-                  name="category"
-                >
-                  <option value="all">Sous-vetements pour femme</option>
-                  <option value="electronics">Electronique</option>
-                  <option value="fashion">Mode</option>
-                  <option value="home">Maison</option>
-                </select>
-                <input
-                  className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-market-600 focus:ring-2 focus:ring-market-600/20"
-                  name="q"
-                  placeholder="Recherche par produit, fournisseur ou tendance"
-                  type="search"
-                />
-                <button className="h-11 rounded-lg bg-market-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-market-800">
-                  Rechercher
-                </button>
+        <section
+          className="space-y-3 rounded-2xl bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/5 sm:p-4"
+          id="offres"
+        >
+          <SectionHeader
+            href="/search"
+            subtitle="Des produits publies avec prix clairs et paiement a la livraison."
+            title="Meilleures offres"
+          />
+          <div className="grid grid-cols-2 items-stretch gap-2 md:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-8">
+            {bestOffers.length > 0 ? (
+              bestOffers.map((product) => (
+                <CompactProductCard key={product.id} product={product} />
+              ))
+            ) : (
+              <div className="col-span-full">
+                <EmptyProducts label="Aucune meilleure offre disponible." />
               </div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                <input
-                  className="h-4 w-4 rounded border-slate-300 text-market-700"
-                  type="checkbox"
-                />
-                Recherche par image
-              </label>
-              <a
-                className="inline-flex h-10 items-center rounded-lg border border-market-300 px-4 text-sm font-semibold text-market-800 hover:bg-market-50"
-                href="/search"
-              >
-                Ouvrir la recherche
-              </a>
-            </form>
-          </div>
-        </Container>
-      </section>
-
-      <Container className="space-y-5 py-5">
-        <section className="grid gap-3 xl:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="rounded-lg border border-slate-200 bg-white p-3">
-            <p className="mb-2 text-sm font-bold text-slate-900">Categories pour vous</p>
-            <ul className="space-y-1.5 text-sm text-slate-700">
-              {mainCategories.map((category) => (
-                <li key={category.id}>
-                  <a
-                    className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-slate-100"
-                    href={`/?category=${category.slug}`}
-                  >
-                    <span>{category.name}</span>
-                    <span className="text-slate-400">{">"}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </aside>
-
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {featuredProducts.map((product) => (
-                <a
-                  className="rounded-lg border border-slate-200 bg-white p-3 transition-all hover:-translate-y-0.5 hover:border-market-200 hover:shadow-soft"
-                  href={`/product/${product.slug}`}
-                  key={product.id}
-                >
-                  <p className="mb-2 line-clamp-1 text-sm font-semibold text-slate-700">
-                    Recherches...
-                  </p>
-                  <div className="aspect-[4/3] overflow-hidden rounded-md bg-slate-100">
-                    <img
-                      alt={product.images?.[0]?.altText ?? product.name}
-                      className="h-full w-full object-cover"
-                      src={imageFor(
-                        product,
-                        heroImages[seededIndex(product.id, heroImages.length)],
-                      )}
-                    />
-                  </div>
-                  <p className="mt-2 line-clamp-1 text-sm font-semibold text-slate-900">
-                    {product.name}
-                  </p>
-                </a>
-              ))}
-            </div>
-
-            <article className="rounded-lg bg-gradient-to-br from-market-100 to-market-50 p-4">
-              <p className="text-xl font-bold leading-tight text-market-900">
-                Echantillon personnalise en 3 jours
-              </p>
-              <p className="mt-1 text-xl font-bold leading-tight text-market-900">
-                Echantillon personnalise en 7 jours
-              </p>
-              <div className="mt-4 aspect-[4/3] overflow-hidden rounded-md bg-white/70">
-                <img alt="Featured collection" className="h-full w-full object-cover" src={promoImage} />
-              </div>
-              <a
-                className="mt-3 inline-flex h-10 items-center rounded-lg bg-market-700 px-4 text-sm font-semibold text-white hover:bg-market-800"
-                href="/vendor"
-              >
-                En savoir plus
-              </a>
-            </article>
-          </div>
-        </section>
-
-        <section className="grid gap-3 rounded-lg bg-market-900 p-4 text-white lg:grid-cols-[260px_minmax(0,1fr)]">
-          <div className="space-y-3">
-            <h2 className="text-3xl font-bold">Customization rapide</h2>
-            <p className="text-sm text-market-100">
-              Realisez vos idees de produits personnalises rapidement et facilement.
-            </p>
-            <a
-              className="inline-flex h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-market-900"
-              href="#fabricants"
-            >
-              Decouvrir des maintenant
-            </a>
-            <div className="aspect-[4/3] overflow-hidden rounded-md border border-white/20">
-              <img alt="Quick customization" className="h-full w-full object-cover" src={quickCustomImage} />
-            </div>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            {bestOffers.slice(0, 5).map((product, index) => (
-              <a className="rounded-md bg-white p-2 text-slate-900" href={`/product/${product.slug}`} key={product.id}>
-                <div className="aspect-square overflow-hidden rounded-md bg-slate-100">
-                  <img
-                    alt={product.images?.[0]?.altText ?? product.name}
-                    className="h-full w-full object-cover"
-                    src={imageFor(product, offerImages[index % offerImages.length])}
-                  />
-                </div>
-                <p className="mt-2 line-clamp-1 text-xs font-semibold">{product.name}</p>
-                <p className="text-sm font-bold text-market-800">
-                  {formatTnd(product.offerPrice ?? product.price)}
-                </p>
-              </a>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4" id="offres">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-950">Meilleures offres</h2>
-              <p className="text-sm text-slate-500">
-                Trouvez les meilleurs prix sur FireShop.
-              </p>
-            </div>
-            <a className="text-sm font-semibold text-slate-700 hover:text-market-800" href="/orders">
-              En savoir plus {" >"}
-            </a>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {bestOffers.map((product, index) => (
-              <a
-                className="rounded-md border border-slate-200 bg-white p-2 transition-all hover:-translate-y-0.5 hover:border-market-200 hover:shadow-soft"
-                href={`/product/${product.slug}`}
-                key={product.id}
-              >
-                <div className="aspect-square overflow-hidden rounded-md bg-slate-100">
-                  <img
-                    alt={product.images?.[0]?.altText ?? product.name}
-                    className="h-full w-full object-cover"
-                    src={imageFor(product, offerImages[index % offerImages.length])}
-                  />
-                </div>
-                <p className="mt-2 line-clamp-1 text-xs font-semibold text-slate-900">
-                  {product.name}
-                </p>
-                <p className="text-sm font-bold text-market-800">
-                  {formatTnd(product.offerPrice ?? product.price)}
-                </p>
-                <p className="text-xs text-slate-500">MOQ: 2</p>
-              </a>
-            ))}
+            )}
           </div>
         </section>
 
         <section className="grid gap-3 lg:grid-cols-2" id="produits">
-          <article className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-            <div className="flex items-end justify-between gap-3">
-              <h2 className="text-2xl font-bold text-slate-950">
-                Produits au top du classement
-              </h2>
-              <a className="text-sm font-semibold text-slate-700 hover:text-market-800" href="/orders">
-                En savoir plus {" >"}
-              </a>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {rankedProducts.map((product, index) => (
-                <a className="rounded-md border border-slate-200 p-2" href={`/product/${product.slug}`} key={product.id}>
-                  <div className="aspect-[4/3] overflow-hidden rounded-md bg-slate-100">
-                    <img
-                      alt={product.images?.[0]?.altText ?? product.name}
-                      className="h-full w-full object-cover"
-                      src={imageFor(product, heroImages[index % heroImages.length])}
-                    />
-                  </div>
-                  <p className="mt-2 line-clamp-1 text-sm font-semibold text-slate-900">
-                    {product.name}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {product.vendor?.storeName ?? "Vente a la Une"}
-                  </p>
-                </a>
-              ))}
+          <article className="space-y-3 rounded-2xl bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/5 sm:p-4">
+            <SectionHeader
+              href="/search"
+              subtitle="Une selection compacte pour continuer la decouverte."
+              title="Produits au top"
+            />
+            <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
+              {rankedProducts.length > 0 ? (
+                rankedProducts.map((product) => (
+                  <MiniProductCard key={product.id} product={product} />
+                ))
+              ) : (
+                <div className="sm:col-span-2">
+                  <EmptyProducts label="Le classement sera genere avec les produits publies." />
+                </div>
+              )}
             </div>
           </article>
 
-          <article className="space-y-3 rounded-lg border border-slate-200 bg-white p-4" id="fabricants">
-            <div className="flex items-end justify-between gap-3">
-              <h2 className="text-2xl font-bold text-slate-950">Nouveautes</h2>
-              <a className="text-sm font-semibold text-slate-700 hover:text-market-800" href="/orders">
-                En savoir plus {" >"}
-              </a>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {newArrivals.map((product, index) => (
-                <a className="rounded-md border border-slate-200 p-2" href={`/product/${product.slug}`} key={product.id}>
-                  <div className="aspect-[4/3] overflow-hidden rounded-md bg-slate-100">
-                    <img
-                      alt={product.images?.[0]?.altText ?? product.name}
-                      className="h-full w-full object-cover"
-                      src={imageFor(
-                        product,
-                        heroImages[(index + 1) % heroImages.length],
-                      )}
-                    />
-                  </div>
-                  <p className="mt-2 line-clamp-1 text-sm font-semibold text-slate-900">
-                    {product.name}
-                  </p>
-                  <p className="text-sm font-bold text-market-800">
-                    {formatTnd(product.offerPrice ?? product.price)}
-                  </p>
-                </a>
-              ))}
+          <article className="space-y-3 rounded-2xl bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/5 sm:p-4">
+            <SectionHeader
+              href="/search"
+              subtitle="Les produits recemment publies par les vendeurs."
+              title="Nouveautes"
+            />
+            <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
+              {newArrivals.length > 0 ? (
+                newArrivals.map((product) => (
+                  <MiniProductCard key={product.id} product={product} />
+                ))
+              ) : (
+                <div className="sm:col-span-2">
+                  <EmptyProducts label="Les nouveautes apparaitront apres approbation admin." />
+                </div>
+              )}
             </div>
           </article>
         </section>
@@ -348,4 +339,3 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     </main>
   );
 }
-

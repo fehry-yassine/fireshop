@@ -13,6 +13,7 @@ const adminLinks = [
   { href: "/admin/vendors", label: "Vendors" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/categories", label: "Categories" },
+  { href: "/admin/homepage-promos", label: "Homepage" },
 ];
 
 export function AdminDashboardFrame({ children }: AdminDashboardFrameProps) {

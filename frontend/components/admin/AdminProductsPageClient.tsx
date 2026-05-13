@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminAccessGate } from "@/components/admin/AdminAccessGate";
 import { AdminDashboardFrame } from "@/components/admin/AdminDashboardFrame";
 import { formatDateTime, getErrorMessage } from "@/components/admin/adminUtils";
+import { DashboardDrawer } from "@/components/dashboard/DashboardDrawer";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { SlideOver } from "@/components/ui/SlideOver";
 import { api } from "@/lib/api";
 import { formatTnd } from "@/lib/format";
 import type {
@@ -250,7 +250,6 @@ function AdminProductsContent() {
               <option value="ALL">All statuses</option>
               <option value="DRAFT">Draft</option>
               <option value="PENDING_REVIEW">Pending review</option>
-              <option value="APPROVED">Approved</option>
               <option value="PUBLISHED">Published</option>
               <option value="REJECTED">Rejected</option>
               <option value="ARCHIVED">Archived</option>
@@ -341,7 +340,7 @@ function AdminProductsContent() {
                           <Button className="h-9 px-3" onClick={() => openDrawer(item.id)} variant="secondary">
                             View
                           </Button>
-                          {(item.status === "PENDING_REVIEW" || item.status === "APPROVED") && (
+                          {item.status === "PENDING_REVIEW" && (
                             <Button
                               disabled={activeProductId === item.id}
                               onClick={() => approveProduct(item.id)}
@@ -406,49 +405,44 @@ function AdminProductsContent() {
         </CardContent>
       </Card>
 
-      <SlideOver ariaLabel="Product details" isOpen={drawerOpen} onClose={() => setDrawerOpen(false)}>
-        <div className="space-y-5 p-5 sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-market-700">Product review</p>
-              <h3 className="text-2xl font-bold text-slate-950">Product details</h3>
-            </div>
-            <Button className="h-9 px-3" onClick={() => setDrawerOpen(false)} variant="secondary">
-              Close
-            </Button>
-          </div>
-
-          {drawerLoading ? (
-            <EmptyPanel text="Loading product details." />
-          ) : !drawerProduct ? (
-            <EmptyPanel text="Product details unavailable." />
-          ) : (
-            <AdminProductDetailsPanel
-              activeProductId={activeProductId}
-              onApprove={() => approveProduct(drawerProduct.id)}
-              onArchive={() => archiveProduct(drawerProduct.id)}
-              onReject={() => {
-                setRejectDialogProduct({
-                  id: drawerProduct.id,
-                  name: drawerProduct.name,
-                  title: drawerProduct.title,
-                  image: drawerProduct.images[0]?.url ?? null,
-                  slug: drawerProduct.slug,
-                  price: drawerProduct.offerPrice ?? drawerProduct.price,
-                  stock: drawerProduct.stock,
-                  status: drawerProduct.status,
-                  vendorName: drawerProduct.vendor.storeName,
-                  categoryName: drawerProduct.category.name,
-                  createdAt: drawerProduct.createdAt,
-                  updatedAt: drawerProduct.updatedAt,
-                });
-                setRejectReason("");
-              }}
-              product={drawerProduct}
-            />
-          )}
-        </div>
-      </SlideOver>
+      <DashboardDrawer
+        description="Review vendor submission details and control marketplace visibility."
+        eyebrow="Product review"
+        onClose={() => setDrawerOpen(false)}
+        open={drawerOpen}
+        title="Product details"
+        width="xl"
+      >
+        {drawerLoading ? (
+          <EmptyPanel text="Loading product details." />
+        ) : !drawerProduct ? (
+          <EmptyPanel text="Product details unavailable." />
+        ) : (
+          <AdminProductDetailsPanel
+            activeProductId={activeProductId}
+            onApprove={() => approveProduct(drawerProduct.id)}
+            onArchive={() => archiveProduct(drawerProduct.id)}
+            onReject={() => {
+              setRejectDialogProduct({
+                id: drawerProduct.id,
+                name: drawerProduct.name,
+                title: drawerProduct.title,
+                image: drawerProduct.images[0]?.url ?? null,
+                slug: drawerProduct.slug,
+                price: drawerProduct.offerPrice ?? drawerProduct.price,
+                stock: drawerProduct.stock,
+                status: drawerProduct.status,
+                vendorName: drawerProduct.vendor.storeName,
+                categoryName: drawerProduct.category.name,
+                createdAt: drawerProduct.createdAt,
+                updatedAt: drawerProduct.updatedAt,
+              });
+              setRejectReason("");
+            }}
+            product={drawerProduct}
+          />
+        )}
+      </DashboardDrawer>
 
       <RejectDialog
         isWorking={rejectDialogProduct ? activeProductId === rejectDialogProduct.id : false}
@@ -535,7 +529,7 @@ function AdminProductDetailsPanel({
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        {(product.status === "PENDING_REVIEW" || product.status === "APPROVED") && (
+        {product.status === "PENDING_REVIEW" && (
           <Button disabled={activeProductId === product.id} onClick={onApprove}>
             Approve
           </Button>
@@ -562,10 +556,6 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
 
   if (status === "PENDING_REVIEW") {
     return <Badge tone="warning">Pending review</Badge>;
-  }
-
-  if (status === "APPROVED") {
-    return <Badge className="bg-blue-50 text-blue-700" tone="neutral">Approved</Badge>;
   }
 
   if (status === "PUBLISHED") {

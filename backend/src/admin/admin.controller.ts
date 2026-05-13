@@ -10,6 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { AuthTokenPayload } from '../auth/auth.types';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -28,6 +30,16 @@ export class AdminController {
     private readonly productsService: ProductsService,
     private readonly vendorsService: VendorsService,
   ) {}
+
+  @Get('categories')
+  findCategories() {
+    return this.categoriesService.findAllAdmin();
+  }
+
+  @Get('categories/tree')
+  findCategoryTree() {
+    return this.categoriesService.findTreeAdmin();
+  }
 
   @Post('categories')
   createCategory(@Body() body: unknown) {
@@ -50,13 +62,21 @@ export class AdminController {
   }
 
   @Patch('vendors/applications/:id/approve')
-  approveVendorApplication(@Param('id') id: string, @Body() body: unknown) {
-    return this.vendorsService.approveApplicationAdmin(id, body ?? {});
+  approveVendorApplication(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.vendorsService.approveApplicationAdmin(id, body ?? {}, currentUser);
   }
 
   @Patch('vendors/applications/:id/reject')
-  rejectVendorApplication(@Param('id') id: string, @Body() body: unknown) {
-    return this.vendorsService.rejectApplicationAdmin(id, body ?? {});
+  rejectVendorApplication(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.vendorsService.rejectApplicationAdmin(id, body ?? {}, currentUser);
   }
 
   @Get('vendors')
@@ -99,13 +119,20 @@ export class AdminController {
   }
 
   @Patch('products/:id/approve')
-  approveProduct(@Param('id') id: string) {
-    return this.productsService.approveProductAdmin(id);
+  approveProduct(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+  ) {
+    return this.productsService.approveProductAdmin(id, currentUser);
   }
 
   @Patch('products/:id/reject')
-  rejectProduct(@Param('id') id: string, @Body() body: unknown) {
-    return this.productsService.rejectProductAdmin(id, body ?? {});
+  rejectProduct(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.productsService.rejectProductAdmin(id, body ?? {}, currentUser);
   }
 
   @Patch('products/:id/archive')
@@ -119,12 +146,20 @@ export class AdminController {
   }
 
   @Get('orders')
-  findOrders(@Query('status') status?: string) {
-    return this.ordersService.findAllAdmin(status);
+  findOrders(
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.ordersService.findAllAdmin({ status, page, limit });
   }
 
   @Patch('orders/:id/status')
-  updateOrderStatus(@Param('id') id: string, @Body() body: unknown) {
-    return this.ordersService.updateAdminOrderStatus(id, body ?? {});
+  updateOrderStatus(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.ordersService.updateAdminOrderStatus(id, body ?? {}, currentUser);
   }
 }

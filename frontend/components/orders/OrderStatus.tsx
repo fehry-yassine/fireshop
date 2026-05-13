@@ -11,6 +11,21 @@ export const ORDER_STATUS_OPTIONS: OrderStatus[] = [
   "CANCELLED",
 ];
 
+export const ORDER_STATUS_FLOW: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: ["CONFIRMED", "CANCELLED"],
+  CONFIRMED: ["SHIPPED", "CANCELLED"],
+  SHIPPED: ["DELIVERED", "RETURNED"],
+  DELIVERED: [],
+  RETURNED: [],
+  CANCELLED: [],
+};
+
+const FINAL_ORDER_STATUSES: OrderStatus[] = [
+  "DELIVERED",
+  "RETURNED",
+  "CANCELLED",
+];
+
 const ORDER_STEPS: OrderStatus[] = ORDER_STATUS_OPTIONS.filter(
   (status) => status !== "CANCELLED",
 );
@@ -25,8 +40,41 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   CANCELLED: "Cancelled",
 };
 
+const STATUS_MEANINGS: Record<OrderStatus, string> = {
+  PENDING: "Pending: buyer submitted order",
+  CONFIRMED: "Confirmed: vendor confirmed order",
+  SHIPPED: "Shipped: sent to delivery",
+  DELIVERED: "Delivered: customer received product",
+  CANCELLED: "Cancelled: cancelled before delivery",
+  RETURNED: "Returned: delivery failed/returned",
+};
+
 export function formatOrderStatus(status: OrderStatus) {
   return STATUS_LABELS[status] ?? status;
+}
+
+export function getOrderStatusMeaning(status: OrderStatus) {
+  return STATUS_MEANINGS[status] ?? formatOrderStatus(status);
+}
+
+export function getOrderStatusOptions(currentStatus: OrderStatus) {
+  return Array.from(new Set([currentStatus, ...(ORDER_STATUS_FLOW[currentStatus] ?? [])]));
+}
+
+export function getOrderStatusEffectNote(status: OrderStatus) {
+  if (status === "CANCELLED" || status === "RETURNED") {
+    return "Stock will be restored automatically.";
+  }
+
+  if (status === "DELIVERED") {
+    return "Final delivered order.";
+  }
+
+  return null;
+}
+
+export function isFinalOrderStatus(status: OrderStatus) {
+  return FINAL_ORDER_STATUSES.includes(status);
 }
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {

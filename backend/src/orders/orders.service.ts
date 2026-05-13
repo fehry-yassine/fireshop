@@ -68,6 +68,14 @@ type VendorOrderQuery = {
   deleted?: unknown;
   search?: unknown;
   status?: unknown;
+  page?: unknown;
+  limit?: unknown;
+};
+
+type AdminOrderQuery = {
+  status?: unknown;
+  page?: unknown;
+  limit?: unknown;
 };
 
 type CartItemWithProduct = CartItem & {
@@ -120,6 +128,13 @@ const OPEN_ORDER_STATUSES: OrderStatus[] = [
   OrderStatus.CONFIRMED,
   OrderStatus.SHIPPED,
 ];
+const STOCK_RESTORE_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.CANCELLED,
+  OrderStatus.RETURNED,
+];
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 100;
 
 @Injectable()
 export class OrdersService {
@@ -282,6 +297,7 @@ export class OrdersService {
     const selectedStatus = this.optionalOrderStatus(query.status);
     const showDeleted = this.optionalBoolean(query.deleted);
     const search = this.optionalString(query.search, 'search');
+    const pagination = this.parsePagination(query);
     const where: Prisma.OrderWhereInput = {
       vendorId: vendor.id,
       vendorDeletedAt: showDeleted ? { not: null } : null,
@@ -310,13 +326,22 @@ export class OrdersService {
       ];
     }
 
-    const orders = await this.prisma.order.findMany({
-      where,
-      include: this.orderInclude(),
-      orderBy: { createdAt: 'desc' },
-    });
+    const [orders, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        include: this.orderInclude(),
+        orderBy: { createdAt: 'desc' },
+        skip: (pagination.page - 1) * pagination.limit,
+        take: pagination.limit,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
 
-    return orders.map((order) => this.toOrderResponse(order));
+    return this.paginated(
+      orders.map((order) => this.toOrderResponse(order)),
+      pagination,
+      total,
+    );
   }
 
   async findVendorDashboard(currentUser: AuthTokenPayload) {
@@ -418,7 +443,10 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
-    return this.updateOrderStatus(order, payload);
+    return this.updateOrderStatus(order, payload, {
+      actorUserId: currentUser.sub,
+      action: 'VENDOR_ORDER_STATUS_CHANGED',
+    });
   }
 
   async createVendorOrder(currentUser: AuthTokenPayload, payload: unknown) {
@@ -530,6 +558,8 @@ export class OrdersService {
 
     const body = this.asVendorOrderUpdatePayload(payload);
     const data: Prisma.OrderUpdateInput = {};
+    let nextStatus: OrderStatus | null = null;
+    let statusChanged = false;
 
     if (body.fullName !== undefined) {
       data.shippingFullName = this.requiredString(body.fullName, 'fullName');
@@ -561,8 +591,9 @@ export class OrdersService {
     }
 
     if (body.status !== undefined) {
-      const nextStatus = this.requiredOrderStatus(body.status);
+      nextStatus = this.requiredOrderStatus(body.status);
       this.validateStatusTransition(order.status, nextStatus);
+      statusChanged = order.status !== nextStatus;
       data.status = nextStatus;
     }
 
@@ -570,10 +601,59 @@ export class OrdersService {
       return { order: this.toOrderResponse(order) };
     }
 
-    const updatedOrder = await this.prisma.order.update({
-      where: { id: order.id },
-      data,
-      include: this.orderInclude(),
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      let shouldRestoreStock = false;
+
+      if (
+        statusChanged &&
+        nextStatus &&
+        STOCK_RESTORE_ORDER_STATUSES.includes(nextStatus)
+      ) {
+        const restoreClaim = await tx.order.updateMany({
+          where: { id: order.id, stockRestoredAt: null },
+          data: {
+            status: nextStatus,
+            stockRestoredAt: new Date(),
+          },
+        });
+
+        shouldRestoreStock = restoreClaim.count === 1;
+
+        if (shouldRestoreStock) {
+          for (const item of order.items) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                stockQuantity: { increment: item.quantity },
+              },
+            });
+          }
+        }
+      }
+
+      const savedOrder = await tx.order.update({
+        where: { id: order.id },
+        data,
+        include: this.orderInclude(),
+      });
+
+      if (statusChanged && nextStatus) {
+        await tx.auditLog.create({
+          data: {
+            actorUserId: currentUser.sub,
+            action: 'VENDOR_ORDER_STATUS_CHANGED',
+            entityType: 'Order',
+            entityId: order.id,
+            metadata: {
+              previousStatus: order.status,
+              nextStatus,
+              stockRestored: shouldRestoreStock,
+            },
+          },
+        });
+      }
+
+      return savedOrder;
     });
 
     return { order: this.toOrderResponse(updatedOrder) };
@@ -602,18 +682,35 @@ export class OrdersService {
     return { order: this.toOrderResponse(updatedOrder) };
   }
 
-  async findAllAdmin(status?: unknown) {
-    const selectedStatus = this.optionalOrderStatus(status);
-    const orders = await this.prisma.order.findMany({
-      where: selectedStatus ? { status: selectedStatus } : undefined,
-      include: this.orderInclude(),
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAllAdmin(query: AdminOrderQuery = {}) {
+    const selectedStatus = this.optionalOrderStatus(query.status);
+    const pagination = this.parsePagination(query);
+    const where: Prisma.OrderWhereInput | undefined = selectedStatus
+      ? { status: selectedStatus }
+      : undefined;
+    const [orders, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        include: this.orderInclude(),
+        orderBy: { createdAt: 'desc' },
+        skip: (pagination.page - 1) * pagination.limit,
+        take: pagination.limit,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
 
-    return orders.map((order) => this.toOrderResponse(order));
+    return this.paginated(
+      orders.map((order) => this.toOrderResponse(order)),
+      pagination,
+      total,
+    );
   }
 
-  async updateAdminOrderStatus(id: string, payload: unknown) {
+  async updateAdminOrderStatus(
+    id: string,
+    payload: unknown,
+    currentUser?: AuthTokenPayload,
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: this.orderInclude(),
@@ -623,10 +720,17 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
-    return this.updateOrderStatus(order, payload);
+    return this.updateOrderStatus(order, payload, {
+      actorUserId: currentUser?.sub,
+      action: 'ADMIN_ORDER_STATUS_CHANGED',
+    });
   }
 
-  private async updateOrderStatus(order: OrderWithRelations, payload: unknown) {
+  private async updateOrderStatus(
+    order: OrderWithRelations,
+    payload: unknown,
+    audit: { actorUserId?: string; action: string },
+  ) {
     const body = this.asStatusPayload(payload);
     const nextStatus = this.requiredOrderStatus(body.status);
 
@@ -636,13 +740,90 @@ export class OrdersService {
       return { order: this.toOrderResponse(order) };
     }
 
-    const updatedOrder = await this.prisma.order.update({
-      where: { id: order.id },
-      data: { status: nextStatus },
-      include: this.orderInclude(),
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      let shouldRestoreStock = false;
+
+      if (STOCK_RESTORE_ORDER_STATUSES.includes(nextStatus)) {
+        const restoreClaim = await tx.order.updateMany({
+          where: { id: order.id, stockRestoredAt: null },
+          data: {
+            status: nextStatus,
+            stockRestoredAt: new Date(),
+          },
+        });
+
+        shouldRestoreStock = restoreClaim.count === 1;
+
+        if (shouldRestoreStock) {
+          for (const item of order.items) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                stockQuantity: { increment: item.quantity },
+              },
+            });
+          }
+        } else {
+          await tx.order.update({
+            where: { id: order.id },
+            data: { status: nextStatus },
+          });
+        }
+      } else {
+        await tx.order.update({
+          where: { id: order.id },
+          data: { status: nextStatus },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: audit.actorUserId,
+          action: audit.action,
+          entityType: 'Order',
+          entityId: order.id,
+          metadata: {
+            previousStatus: order.status,
+            nextStatus,
+            stockRestored: shouldRestoreStock,
+          },
+        },
+      });
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: order.id },
+        include: this.orderInclude(),
+      });
     });
 
     return { order: this.toOrderResponse(updatedOrder) };
+  }
+
+  private parsePagination(query: { page?: unknown; limit?: unknown }) {
+    const page = this.optionalPositiveInt(query.page, 'page') ?? DEFAULT_PAGE;
+    const limit = this.optionalPositiveInt(query.limit, 'limit') ?? DEFAULT_LIMIT;
+
+    if (limit > MAX_LIMIT) {
+      throw new BadRequestException(`limit must be between 1 and ${MAX_LIMIT}`);
+    }
+
+    return { page, limit };
+  }
+
+  private paginated<T>(
+    items: T[],
+    pagination: { page: number; limit: number },
+    total: number,
+  ) {
+    return {
+      items,
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pagination.limit)),
+      },
+    };
   }
 
   private async findActiveUser(id: string) {
@@ -873,6 +1054,25 @@ export class OrdersService {
     }
 
     return this.requiredOrderStatus(value);
+  }
+
+  private optionalPositiveInt(value: unknown, field: string) {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+
+    const parsed =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string'
+          ? Number(value)
+          : Number.NaN;
+
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new BadRequestException(`${field} must be a positive integer`);
+    }
+
+    return parsed;
   }
 
   private requiredOrderStatus(value: unknown) {

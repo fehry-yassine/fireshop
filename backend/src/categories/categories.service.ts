@@ -45,6 +45,52 @@ export class CategoriesService {
     });
   }
 
+  findAllAdmin() {
+    return this.prisma.category.findMany({
+      include: {
+        parent: true,
+        children: {
+          orderBy: { name: 'asc' },
+        },
+        _count: {
+          select: {
+            children: true,
+            products: true,
+          },
+        },
+      },
+      orderBy: [{ parentId: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  findTreeAdmin() {
+    return this.prisma.category.findMany({
+      where: {
+        parentId: null,
+      },
+      include: {
+        children: {
+          orderBy: { name: 'asc' },
+          include: {
+            _count: {
+              select: {
+                children: true,
+                products: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            children: true,
+            products: true,
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async findBySlugPublic(slug: string) {
     const category = await this.prisma.category.findUnique({
       where: { slug },

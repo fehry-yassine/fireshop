@@ -213,14 +213,6 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
     );
   }
 
-  if (status === "APPROVED") {
-    return (
-      <Badge className="bg-blue-50 text-blue-700" tone="neutral">
-        Approved
-      </Badge>
-    );
-  }
-
   if (status === "REJECTED") {
     return (
       <Badge className="vendor-status-danger" tone="neutral">

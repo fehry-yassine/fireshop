@@ -383,7 +383,7 @@ async function seedProducts() {
         data: [
             {
                 productId: ids.products.earbuds,
-                url: 'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f37',
+                url: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0',
                 altText: 'Wireless earbuds product image',
                 sortOrder: 1,
             },
