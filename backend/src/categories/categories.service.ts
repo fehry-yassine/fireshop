@@ -196,6 +196,43 @@ export class CategoriesService {
     });
   }
 
+  async deletePermanentAdmin(id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const category = await tx.category.findUnique({ where: { id } });
+
+      if (!category) {
+        throw new NotFoundException('Category not found');
+      }
+
+      const productCount = await tx.product.count({
+        where: { categoryId: id },
+      });
+
+      if (productCount > 0) {
+        throw new BadRequestException(
+          'Cannot permanently delete a category with products.',
+        );
+      }
+
+      const childCount = await tx.category.count({
+        where: { parentId: id },
+      });
+
+      if (childCount > 0) {
+        throw new BadRequestException(
+          'Cannot permanently delete a category with subcategories.',
+        );
+      }
+
+      await tx.category.delete({ where: { id } });
+
+      return {
+        category,
+        success: true,
+      };
+    });
+  }
+
   private async findCategoryByIdOrThrow(id: string) {
     const category = await this.prisma.category.findUnique({ where: { id } });
 

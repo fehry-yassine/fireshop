@@ -193,6 +193,53 @@ function AdminCategoriesContent() {
     }
   }
 
+  async function deleteCategoryPermanently(category: Category) {
+    const productCount = getProductCount(category);
+    const subcategoryCount = categories.filter(
+      (child) => child.parentId === category.id,
+    ).length;
+
+    if (productCount > 0 || subcategoryCount > 0) {
+      setMessage({
+        categoryId: category.id,
+        text:
+          productCount > 0
+            ? "Cannot permanently delete a category with products."
+            : "Cannot permanently delete a category with subcategories.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Delete this category permanently? This is only safe for test or mistaken categories with no products and no subcategories.",
+      )
+    ) {
+      return;
+    }
+
+    setActiveCategoryId(category.id);
+    setMessage(null);
+
+    try {
+      await api.admin.categories.deletePermanent(category.id);
+      setMessage({
+        text: "Category permanently deleted.",
+        tone: "success",
+      });
+      await loadCategories();
+    } catch (error) {
+      setMessage({
+        categoryId: category.id,
+        text: getErrorMessage(error, "Could not permanently delete category."),
+        tone: "error",
+      });
+    } finally {
+      setActiveCategoryId(null);
+    }
+  }
+
   const rootCategories = useMemo(
     () => categories.filter((category) => !category.parentId),
     [categories],
@@ -383,6 +430,7 @@ function AdminCategoriesContent() {
                   childrenToShow={children}
                   key={category.id}
                   message={message}
+                  onDelete={deleteCategoryPermanently}
                   onCreateSubcategory={() => openCreatePanel(category.id)}
                   onEdit={openEditPanel}
                   onToggleStatus={toggleCategoryStatus}
@@ -452,6 +500,7 @@ function CategoryGroup({
   childrenToShow,
   message,
   onCreateSubcategory,
+  onDelete,
   onEdit,
   onToggleStatus,
   parentMatches,
@@ -462,6 +511,7 @@ function CategoryGroup({
   childrenToShow: Category[];
   message: CategoryMessage | null;
   onCreateSubcategory: () => void;
+  onDelete: (category: Category) => void;
   onEdit: (category: Category) => void;
   onToggleStatus: (category: Category) => void;
   parentMatches: boolean;
@@ -475,6 +525,7 @@ function CategoryGroup({
           category={category}
           message={message?.categoryId === category.id ? message : null}
           onCreateSubcategory={onCreateSubcategory}
+          onDelete={() => onDelete(category)}
           onEdit={() => onEdit(category)}
           onToggleStatus={() => onToggleStatus(category)}
           subcategoryCount={totalSubcategories}
@@ -504,6 +555,7 @@ function CategoryGroup({
               category={child}
               key={child.id}
               message={message?.categoryId === child.id ? message : null}
+              onDelete={() => onDelete(child)}
               onEdit={() => onEdit(child)}
               onToggleStatus={() => onToggleStatus(child)}
               variant="child"
@@ -520,6 +572,7 @@ function CategoryRow({
   category,
   message,
   onCreateSubcategory,
+  onDelete,
   onEdit,
   onToggleStatus,
   subcategoryCount = 0,
@@ -529,6 +582,7 @@ function CategoryRow({
   category: Category;
   message: CategoryMessage | null;
   onCreateSubcategory?: () => void;
+  onDelete: () => void;
   onEdit: () => void;
   onToggleStatus: () => void;
   subcategoryCount?: number;
@@ -536,6 +590,9 @@ function CategoryRow({
 }) {
   const isWorking = activeCategoryId === category.id;
   const active = isCategoryActive(category);
+  const productCount = getProductCount(category);
+  const resolvedSubcategoryCount = getSubcategoryCount(category, subcategoryCount);
+  const canDelete = productCount === 0 && resolvedSubcategoryCount === 0;
 
   return (
     <div
@@ -589,12 +646,12 @@ function CategoryRow({
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
-          <CountPill label="Products" value={category._count?.products ?? 0} />
+          <CountPill label="Products" value={productCount} />
           {variant === "parent" ? (
             <CountPill
               label="Subcategories"
               tone="market"
-              value={subcategoryCount}
+              value={resolvedSubcategoryCount}
             />
           ) : null}
         </div>
@@ -627,6 +684,18 @@ function CategoryRow({
         >
           {isWorking ? "Saving" : active ? "Disable" : "Enable"}
         </Button>
+        {canDelete ? (
+          <Button
+            className="h-9 border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100 hover:text-red-800"
+            disabled={isWorking}
+            onClick={onDelete}
+            title="Delete permanently"
+            variant="secondary"
+          >
+            <TrashIcon />
+            Delete
+          </Button>
+        ) : null}
         <p className="basis-full text-xs font-medium text-slate-500 lg:text-right">
           Disable hides this category from shoppers.
         </p>
@@ -1094,6 +1163,14 @@ function isCategoryActive(category: Category) {
   return category.isActive !== false;
 }
 
+function getProductCount(category: Category) {
+  return category._count?.products ?? 0;
+}
+
+function getSubcategoryCount(category: Category, fallback = 0) {
+  return category._count?.children ?? category.children?.length ?? fallback;
+}
+
 function cleanOptional(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
@@ -1166,6 +1243,20 @@ function CheckIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="2.4"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path
+        d="M5 7h14M9 11h6M7 7l1 12h8l1-12M9 7V4h6v3"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
       />
     </svg>
   );
