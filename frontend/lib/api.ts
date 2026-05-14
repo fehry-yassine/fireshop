@@ -462,6 +462,17 @@ export const admin = {
       request<Product>(`/admin/products/${id}/archive`, {
         method: "PATCH",
       }),
+    republish: (id: string) =>
+      request<Product>(`/admin/products/${id}/republish`, {
+        method: "PATCH",
+      }),
+    deletePermanent: (id: string) =>
+      request<{ deleted: boolean; id: string; ok: boolean }>(
+        `/admin/products/${id}/permanent`,
+        {
+          method: "DELETE",
+        },
+      ),
     feature: (id: string, featured: boolean) =>
       request<Product>(`/admin/products/${id}/feature`, {
         method: "PATCH",

@@ -20,6 +20,8 @@ type BackofficeFrameProps = {
   brand?: "default" | "fireshop";
   children: ReactNode;
   links: BackofficeLink[];
+  logoAlt?: string;
+  logoSrc?: string;
   panelLabel: string;
   panelTitle: string;
   panelSubtitle: string;
@@ -37,6 +39,8 @@ export function BackofficeFrame({
   brand = "default",
   children,
   links,
+  logoAlt,
+  logoSrc,
   panelLabel,
   panelTitle,
   panelSubtitle,
@@ -102,38 +106,37 @@ export function BackofficeFrame({
         className={cn(
           "grid min-h-screen lg:h-screen",
           isFireShop
-            ? "lg:grid-cols-[268px_minmax(0,1fr)]"
+            ? "lg:grid-cols-[252px_minmax(0,1fr)]"
             : "lg:grid-cols-[248px_minmax(0,1fr)]",
         )}
       >
         <aside
           className={cn(
-            "overflow-hidden p-3 text-white lg:h-screen",
+            "overflow-hidden p-2.5 text-white lg:h-screen",
             isFireShop
               ? "vendor-sidebar"
               : "bg-[#311552]",
           )}
         >
           <div className="flex h-full min-h-0 flex-col">
-            <div className="shrink-0 px-2 py-2">
-              <div className="flex flex-col items-start gap-3">
-                {isFireShop ? (
-                  <div className="vendor-logo-tile w-full">
-                    <Image
-                      alt="FireShop"
-                      className="h-auto w-full max-w-[236px] object-contain"
-                      height={112}
-                      src="/branding/fireshop-logo.png"
-                      width={236}
-                    />
-                  </div>
-                ) : null}
-              </div>
+            <div className="shrink-0 px-2 pb-1 pt-2">
+              {isFireShop ? (
+                <div className="vendor-logo-tile relative mx-auto h-24 w-full max-w-[188px]">
+                  <Image
+                    alt={logoAlt ?? "FireShop workspace"}
+                    className="object-contain"
+                    fill
+                    priority
+                    sizes="188px"
+                    src={logoSrc ?? "/branding/fireshop-logo.png"}
+                  />
+                </div>
+              ) : null}
             </div>
 
             <div
               className={cn(
-                "mx-2 mt-2.5 shrink-0 border px-3 py-2",
+                "mx-1.5 mt-1.5 shrink-0 border px-3 py-2.5",
                 isFireShop
                   ? "vendor-identity-card"
                   : "border-white/10 bg-[#8e43db]",
@@ -152,16 +155,16 @@ export function BackofficeFrame({
                   Workspace
                 </span>
               </div>
-              <p className="vendor-title mt-1.5 text-[1.46rem] font-extrabold leading-[1.05]">
+              <p className="vendor-title mt-1.5 min-w-0 break-words text-[1.08rem] font-extrabold leading-tight">
                 {panelTitle}
               </p>
-              <p className={cn("mt-1 text-[12px]", isFireShop ? "vendor-muted" : "text-purple-100")}>
+              <p className={cn("mt-1 truncate text-[12px]", isFireShop ? "vendor-muted" : "text-purple-100")}>
                 {panelSubtitle}
               </p>
             </div>
 
-            <div className="vendor-sidebar-scroll mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
-              <nav className="space-y-1.5">
+            <div className="vendor-sidebar-scroll mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 pb-1.5">
+              <nav className="space-y-1">
                 {links.map((item) => {
                   const isActive =
                     pathname === item.href ||
@@ -172,21 +175,21 @@ export function BackofficeFrame({
                   return item.disabled ? (
                     <div
                       className={cn(
-                        "flex h-12 cursor-not-allowed items-center justify-between rounded-xl px-4 text-sm font-semibold",
+                        "flex h-11 cursor-not-allowed items-center justify-between rounded-lg px-3.5 text-sm font-semibold",
                         isFireShop ? "vendor-nav-link vendor-nav-link-disabled" : "text-purple-200/70",
                       )}
                       key={item.href}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="vendor-nav-icon inline-flex h-7 w-7 items-center justify-center rounded-lg">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="vendor-nav-icon inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
                           <SidebarIcon label={item.label} />
                         </span>
-                        <span>{item.label}</span>
+                        <span className="truncate">{item.label}</span>
                       </div>
                       {item.badge ? (
                         <span
                           className={cn(
-                            "rounded-full bg-white/10 px-2 py-1 text-xs",
+                            "shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[11px]",
                             isFireShop ? "vendor-soft-pill" : "text-purple-100",
                           )}
                         >
@@ -197,7 +200,7 @@ export function BackofficeFrame({
                   ) : (
                     <Link
                       className={cn(
-                        "flex h-12 items-center justify-between rounded-xl px-4 text-sm font-semibold transition-colors",
+                        "flex h-11 items-center justify-between rounded-lg px-3.5 text-sm font-semibold transition-colors",
                         isFireShop
                           ? isActive
                             ? "vendor-nav-link vendor-nav-link-active"
@@ -209,10 +212,10 @@ export function BackofficeFrame({
                       href={item.href}
                       key={item.href}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex min-w-0 items-center gap-2.5">
                         <span
                           className={cn(
-                            "inline-flex h-7 w-7 items-center justify-center rounded-lg",
+                            "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
                             isFireShop ? "vendor-nav-icon" : isActive
                               ? "bg-[#FFF4EB] text-[#FF6A2D]"
                               : "bg-white/10 text-white/85",
@@ -220,12 +223,12 @@ export function BackofficeFrame({
                         >
                           <SidebarIcon label={item.label} />
                         </span>
-                        <span>{item.label}</span>
+                        <span className="truncate">{item.label}</span>
                       </div>
                       {item.badge ? (
                         <span
                           className={cn(
-                            "rounded-full px-2 py-1 text-xs",
+                            "shrink-0 rounded-full px-1.5 py-0.5 text-[11px]",
                             isActive
                               ? isFireShop
                                 ? "vendor-active-pill"
@@ -245,23 +248,23 @@ export function BackofficeFrame({
 
               <div
                 className={cn(
-                  "mt-5 rounded-2xl p-4 text-sm leading-6",
+                  "mt-4 rounded-lg p-3 text-xs leading-5",
                   isFireShop
                     ? "vendor-help-card"
                     : "bg-black/20 text-purple-50",
                 )}
               >
-                <p className="vendor-title font-bold">Need help?</p>
+                <p className="vendor-title text-sm font-bold">Need help?</p>
                 <p className="mt-1">{supportText}</p>
                 {isFireShop ? (
-                  <div className="mt-4 flex items-center gap-2">
-                    <span className="vendor-soft-pill inline-flex h-9 min-w-10 items-center justify-center rounded-full px-3 text-xs font-bold">
+                  <div className="mt-3 flex items-center gap-1.5">
+                    <span className="vendor-soft-pill inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[11px] font-bold">
                       YouTube
                     </span>
-                    <span className="vendor-soft-pill inline-flex h-9 min-w-10 items-center justify-center rounded-full px-3 text-xs font-bold">
+                    <span className="vendor-soft-pill inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[11px] font-bold">
                       WhatsApp
                     </span>
-                    <span className="vendor-soft-pill inline-flex h-9 min-w-10 items-center justify-center rounded-full px-3 text-xs font-bold">
+                    <span className="vendor-soft-pill inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[11px] font-bold">
                       Meta
                     </span>
                   </div>
@@ -274,13 +277,13 @@ export function BackofficeFrame({
         <div className="min-w-0 lg:flex lg:h-screen lg:min-h-0 lg:flex-col lg:overflow-hidden">
           <header
             className={cn(
-              "sticky top-0 z-20 min-h-[68px] border-b px-4 py-3 lg:shrink-0 lg:px-5",
+              "sticky top-0 z-20 min-h-[72px] border-b px-4 py-3 lg:shrink-0 lg:px-5",
               isFireShop
                 ? "vendor-topbar"
                 : "border-slate-200 bg-white",
             )}
           >
-            <div className="flex min-h-[44px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-h-[46px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className={cn(isFireShop ? "space-y-0" : undefined)}>
                 {isFireShop ? (
                   <div className="vendor-muted flex items-center gap-2 text-[13px] font-semibold">
@@ -320,7 +323,7 @@ export function BackofficeFrame({
                   </button>
                 ) : null}
                 {isFireShop ? (
-                  <div className="vendor-chip inline-flex h-11 items-center px-3 text-sm font-semibold">
+                  <div className="vendor-chip inline-flex h-10 max-w-[220px] items-center overflow-hidden truncate whitespace-nowrap px-3 text-sm font-semibold">
                     {panelTitle}
                   </div>
                 ) : null}
@@ -330,7 +333,7 @@ export function BackofficeFrame({
                       aria-expanded={isAccountMenuOpen}
                       aria-haspopup="menu"
                       aria-label="Open account menu"
-                      className="vendor-account-button flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white"
+                      className="vendor-account-button flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
                       onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
                       type="button"
                     >
@@ -338,7 +341,7 @@ export function BackofficeFrame({
                     </button>
                     {isAccountMenuOpen ? (
                       <div
-                        className="vendor-account-menu absolute right-0 top-12 z-40 w-72 rounded-lg border p-3"
+                        className="vendor-account-menu absolute right-0 top-11 z-40 w-72 rounded-lg border p-3"
                         role="menu"
                       >
                         <div className="border-b pb-3">
@@ -382,7 +385,7 @@ export function BackofficeFrame({
 
           <main
             className={cn(
-              "space-y-4 p-5 pt-[18px] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5 lg:py-5",
+              "space-y-4 p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-5 lg:py-4 xl:px-6",
               isFireShop ? "vendor-main" : undefined,
             )}
           >

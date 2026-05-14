@@ -194,6 +194,22 @@ export class AdminController {
     return this.productsService.archiveProductAdmin(id);
   }
 
+  @Patch('products/:id/republish')
+  republishProduct(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+  ) {
+    return this.productsService.republishProductAdmin(id, currentUser);
+  }
+
+  @Delete('products/:id/permanent')
+  deleteProductPermanently(
+    @CurrentUser() currentUser: AuthTokenPayload,
+    @Param('id') id: string,
+  ) {
+    return this.productsService.deleteProductPermanentAdmin(id, currentUser);
+  }
+
   @Patch('products/:id/feature')
   featureProduct(@Param('id') id: string, @Body() body: unknown) {
     return this.productsService.featureProductAdmin(id, body ?? {});

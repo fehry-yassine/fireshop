@@ -164,6 +164,80 @@ export class ProductLifecycleService {
     });
   }
 
+  async republishProductAdmin(id: string, currentUser?: AuthTokenPayload) {
+    const product = await this.findProductWithRelationsByIdOrThrow(id);
+
+    if (product.status !== ProductStatus.ARCHIVED) {
+      throw new ConflictException('Only archived products can be republished');
+    }
+
+    const validationErrors = this.validateProductForPublishing(product);
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(validationErrors.join('; '));
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedProduct = await tx.product.update({
+        where: { id: product.id },
+        data: {
+          status: ProductStatus.PUBLISHED,
+          isActive: true,
+          rejectionReason: null,
+        },
+        include: this.productIncludes(),
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: currentUser?.sub,
+          action: 'ADMIN_PRODUCT_REPUBLISHED',
+          entityType: 'Product',
+          entityId: product.id,
+          metadata: {
+            previousStatus: product.status,
+            nextStatus: ProductStatus.PUBLISHED,
+          },
+        },
+      });
+
+      return updatedProduct;
+    });
+  }
+
+  async deleteProductPermanentAdmin(id: string, currentUser?: AuthTokenPayload) {
+    const product = await this.findProductByIdOrThrow(id);
+
+    return this.prisma.$transaction(async (tx) => {
+      const orderItemCount = await tx.orderItem.count({
+        where: { productId: product.id },
+      });
+
+      if (orderItemCount > 0) {
+        throw new ConflictException(
+          'This product has order history and cannot be permanently deleted. Archive it instead.',
+        );
+      }
+
+      await tx.cartItem.deleteMany({ where: { productId: product.id } });
+      await tx.productImage.deleteMany({ where: { productId: product.id } });
+      await tx.product.delete({ where: { id: product.id } });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: currentUser?.sub,
+          action: 'ADMIN_PRODUCT_PERMANENTLY_DELETED',
+          entityType: 'Product',
+          entityId: product.id,
+          metadata: {
+            previousStatus: product.status,
+          },
+        },
+      });
+
+      return { ok: true, deleted: true, id: product.id };
+    });
+  }
+
   async featureProductAdmin(id: string, payload: unknown) {
     const product = await this.findProductByIdOrThrow(id);
     const body = this.asAdminFeaturePayload(payload);

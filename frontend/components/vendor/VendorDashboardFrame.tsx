@@ -22,6 +22,8 @@ export function VendorDashboardFrame({ children, user, vendor }: VendorDashboard
     <BackofficeFrame
       brand="fireshop"
       links={vendorLinks}
+      logoAlt="FireShop seller workspace"
+      logoSrc="/brand/fireshop-seller-logo.png"
       panelLabel="Seller Panel"
       panelSubtitle={vendor.slug}
       panelTitle={vendor.storeName}

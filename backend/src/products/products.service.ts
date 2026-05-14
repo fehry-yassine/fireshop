@@ -106,6 +106,20 @@ export class ProductsService {
     return this.productLifecycleService.archiveProductAdmin(id);
   }
 
+  async republishProductAdmin(id: string, currentUser?: AuthTokenPayload) {
+    return this.productLifecycleService.republishProductAdmin(id, currentUser);
+  }
+
+  async deleteProductPermanentAdmin(
+    id: string,
+    currentUser?: AuthTokenPayload,
+  ) {
+    return this.productLifecycleService.deleteProductPermanentAdmin(
+      id,
+      currentUser,
+    );
+  }
+
   async featureProductAdmin(id: string, payload: unknown) {
     return this.productLifecycleService.featureProductAdmin(id, payload);
   }

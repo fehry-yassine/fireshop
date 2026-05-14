@@ -141,6 +141,7 @@ export type AdminProductListItem = {
   status: Product["status"];
   vendorName: string;
   categoryName: string;
+  orderItemCount: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -195,6 +196,7 @@ export type AdminProductDetails = {
     slug: string;
     isActive: boolean;
   };
+  orderItemCount: number;
   createdAt: string;
   updatedAt: string;
 };

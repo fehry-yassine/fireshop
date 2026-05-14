@@ -103,6 +103,7 @@ export type ProductWithRelations = Product & {
   category: Category;
   images: ProductImage[];
   vendor: Vendor & { user: User };
+  _count: { orderItems: number };
 };
 
 const VALID_LOCALES: RecommendationLocale[] = ['auto', 'en', 'fr', 'ar_tn'];
@@ -278,7 +279,7 @@ export class ProductQueryService {
   async findPendingAdmin() {
     return this.prisma.product.findMany({
       where: { status: ProductStatus.PENDING_REVIEW },
-      include: this.productIncludes(),
+      include: this.adminProductIncludes(),
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -291,7 +292,7 @@ export class ProductQueryService {
       await this.prisma.$transaction([
         this.prisma.product.findMany({
           where,
-          include: this.productIncludes(),
+          include: this.adminProductIncludes(),
           orderBy: { createdAt: 'desc' },
           skip: (parsed.page - 1) * parsed.limit,
           take: parsed.limit,
@@ -441,6 +442,7 @@ protected readonly queryProductBoosts = new Map<string, Map<string, number>>();
       vendor: { storeName: string };
       category: { name: string };
       images: Array<{ url: string }>;
+      _count: { orderItems: number };
     },
   ) {
     return {
@@ -454,6 +456,7 @@ protected readonly queryProductBoosts = new Map<string, Map<string, number>>();
       status: product.status,
       vendorName: product.vendor.storeName,
       categoryName: product.category.name,
+      orderItemCount: product._count.orderItems,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
     };
@@ -501,6 +504,7 @@ protected readonly queryProductBoosts = new Map<string, Map<string, number>>();
         slug: product.category.slug,
         isActive: product.category.isActive,
       },
+      orderItemCount: product._count.orderItems,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
     };
@@ -1190,12 +1194,28 @@ protected readonly queryProductBoosts = new Map<string, Map<string, number>>();
     };
   }
 
+  private adminProductIncludes() {
+    return {
+      ...this.productIncludes(),
+      _count: {
+        select: {
+          orderItems: true,
+        },
+      },
+    };
+  }
+
   private productRelationsInclude() {
     return {
       vendor: { include: { user: true } },
       category: true,
       images: {
         orderBy: { sortOrder: 'asc' as const },
+      },
+      _count: {
+        select: {
+          orderItems: true,
+        },
       },
     };
   }
