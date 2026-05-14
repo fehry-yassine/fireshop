@@ -422,6 +422,17 @@ export const orders = {
 };
 
 export const admin = {
+  uploads: {
+    image: (file: File) => {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      return request<{ url: string }>("/admin/uploads/image", {
+        method: "POST",
+        body: formData,
+      });
+    },
+  },
   products: {
     list: (query?: {
       status?: Product["status"] | "ALL";
@@ -507,6 +518,13 @@ export const admin = {
       request<Category>(`/admin/categories/${id}`, {
         method: "DELETE",
       }),
+    deletePermanent: (id: string) =>
+      request<{ category: Category; success: boolean }>(
+        `/admin/categories/${id}/permanent`,
+        {
+          method: "DELETE",
+        },
+      ),
   },
   homepagePromos: {
     list: (query?: { type?: HomepagePromo["type"] }) =>

@@ -47,7 +47,7 @@ export class HomepagePromosService {
 
   async createAdmin(payload: HomepagePromoPayload) {
     const type = this.requiredType(payload.type);
-    const title = this.requiredString(payload.title, 'title');
+    const title = this.optionalTitle(payload.title);
 
     return this.prisma.homepagePromo.create({
       data: {
@@ -71,7 +71,7 @@ export class HomepagePromosService {
     }
 
     if (payload.title !== undefined) {
-      data.title = this.requiredString(payload.title, 'title');
+      data.title = this.optionalTitle(payload.title);
     }
 
     if (payload.subtitle !== undefined) {
@@ -145,15 +145,18 @@ export class HomepagePromosService {
     return this.requiredType(value);
   }
 
-  private requiredString(value: unknown, field: string) {
-    if (typeof value !== 'string' || value.trim().length === 0) {
-      throw new BadRequestException(`${field} is required`);
+  private optionalTitle(value: unknown) {
+    if (value === undefined || value === null) {
+      return '';
+    }
+
+    if (typeof value !== 'string') {
+      throw new BadRequestException('title must be a string');
     }
 
     const trimmed = value.trim();
-
     if (trimmed.length > 160) {
-      throw new BadRequestException(`${field} is too long`);
+      throw new BadRequestException('title is too long');
     }
 
     return trimmed;

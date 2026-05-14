@@ -114,15 +114,20 @@ function buildPromoCards(promos: HomepagePromo[]): HomePromoCard[] {
 
   return activePromos
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    .map((promo, index) => ({
-      alt: promo.title,
-      eyebrow: promo.subtitle?.trim() || "Recherches frequentes",
-      href: promo.linkUrl || "/search",
-      id: promo.id,
-      imageUrl: promo.imageUrl,
-      title: promo.title,
-      visualType: promoVisuals[index % promoVisuals.length],
-    }));
+    .map((promo, index) => {
+      const title = promo.title.trim();
+      const subtitle = promo.subtitle?.trim() ?? "";
+
+      return {
+        alt: title || subtitle || "Homepage promo",
+        eyebrow: subtitle,
+        href: promo.linkUrl || "/search",
+        id: promo.id,
+        imageUrl: promo.imageUrl,
+        title,
+        visualType: promoVisuals[index % promoVisuals.length],
+      };
+    });
 }
 
 function buildBannerSlides(promos: HomepagePromo[]): HomeBannerSlide[] {
@@ -134,16 +139,21 @@ function buildBannerSlides(promos: HomepagePromo[]): HomeBannerSlide[] {
 
   return activePromos
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    .map((promo, index) => ({
-      alt: promo.title,
-      ctaLabel: "Voir plus",
-      href: promo.linkUrl || "/search",
-      id: promo.id,
-      imageUrl: promo.imageUrl,
-      subtitle: promo.subtitle,
-      title: promo.title,
-      visualType: bannerVisuals[index % bannerVisuals.length],
-    }));
+    .map((promo, index) => {
+      const title = promo.title.trim();
+      const subtitle = promo.subtitle?.trim() ?? "";
+
+      return {
+        alt: title || subtitle || "Homepage promo",
+        ctaLabel: "Voir plus",
+        href: promo.linkUrl || "/search",
+        id: promo.id,
+        imageUrl: promo.imageUrl,
+        subtitle,
+        title,
+        visualType: bannerVisuals[index % bannerVisuals.length],
+      };
+    });
 }
 
 export function HomeDiscoveryHero({
@@ -339,24 +349,37 @@ export function HomeDiscoveryHero({
 }
 
 function PromoSearchCard({ promo }: { promo: HomePromoCard }) {
+  const hasText = promo.eyebrow.length > 0 || promo.title.length > 0;
+
   return (
     <Link
       className="group block min-w-[250px] overflow-hidden rounded-lg bg-[#f7f7f7] p-5 outline-none transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(15,23,42,0.10)] focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2 lg:min-w-0"
       href={promo.href}
     >
       <article className="flex h-full min-h-[338px] flex-col lg:min-h-0">
-        <div>
-          <p className="text-2xl font-extrabold leading-tight text-slate-950">
-            {promo.eyebrow}
-          </p>
-          <p
-            className="mt-1 text-lg font-bold leading-tight text-slate-800"
-            dir="auto"
-          >
-            {promo.title}
-          </p>
-        </div>
-        <div className="mt-5 flex flex-1 items-center justify-center overflow-hidden rounded-lg bg-white p-4">
+        {hasText ? (
+          <div>
+            {promo.eyebrow ? (
+              <p className="text-2xl font-extrabold leading-tight text-slate-950">
+                {promo.eyebrow}
+              </p>
+            ) : null}
+            {promo.title ? (
+              <p
+                className="mt-1 text-lg font-bold leading-tight text-slate-800"
+                dir="auto"
+              >
+                {promo.title}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <div
+          className={cn(
+            "flex flex-1 items-center justify-center overflow-hidden rounded-lg bg-white p-4",
+            hasText && "mt-5",
+          )}
+        >
           {promo.imageUrl ? (
             <img
               alt={promo.alt}
@@ -424,6 +447,9 @@ function PromoVisual({ type }: { type: PromoVisualType }) {
 }
 
 function BannerVisual({ slide }: { slide: HomeBannerSlide }) {
+  const hasTitle = slide.title.length > 0;
+  const hasSubtitle = Boolean(slide.subtitle?.trim());
+
   return (
     <div className="relative h-full min-h-[292px] overflow-hidden rounded-lg bg-[linear-gradient(135deg,#ffe3c4,#fff7ed_48%,#fed7aa)] lg:min-h-0">
       {slide.imageUrl ? (
@@ -443,11 +469,18 @@ function BannerVisual({ slide }: { slide: HomeBannerSlide }) {
       <div className="absolute inset-0 bg-gradient-to-br from-white/72 via-white/18 to-market-900/12" />
       <div className="relative z-[1] grid h-full min-h-[292px] grid-rows-[auto_minmax(0,1fr)_auto] p-7 lg:min-h-0">
         <div>
-          <h2 className="max-w-[280px] text-4xl font-black leading-none tracking-tight text-slate-950">
-            {slide.title}
-          </h2>
-          {slide.subtitle ? (
-            <p className="mt-3 max-w-[260px] text-sm font-semibold leading-5 text-slate-700">
+          {hasTitle ? (
+            <h2 className="max-w-[280px] text-4xl font-black leading-none tracking-tight text-slate-950">
+              {slide.title}
+            </h2>
+          ) : null}
+          {hasSubtitle ? (
+            <p
+              className={cn(
+                "max-w-[260px] text-sm font-semibold leading-5 text-slate-700",
+                hasTitle && "mt-3",
+              )}
+            >
               {slide.subtitle}
             </p>
           ) : null}

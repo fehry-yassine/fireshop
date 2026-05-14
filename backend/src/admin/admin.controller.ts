@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,8 +8,11 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@prisma/client';
 import { AuthTokenPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -19,12 +23,43 @@ import { CategoriesService } from '../categories/categories.service';
 import { OrdersService } from '../orders/orders.service';
 import { ProductsService } from '../products/products.service';
 import { VendorsService } from '../vendors/vendors.service';
+import {
+  AdminMediaService,
+  UploadedAdminImageFile,
+} from './admin-media.service';
+
+const MAX_ADMIN_IMAGE_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_ADMIN_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
+
+function adminImageUploadFileFilter(
+  _request: unknown,
+  file: { mimetype?: string },
+  callback: (error: Error | null, acceptFile: boolean) => void,
+) {
+  if (!file.mimetype || !ALLOWED_ADMIN_IMAGE_MIME_TYPES.has(file.mimetype)) {
+    callback(
+      new BadRequestException(
+        'Only JPEG, PNG, WebP, and GIF image files are allowed',
+      ),
+      false,
+    );
+    return;
+  }
+
+  callback(null, true);
+}
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class AdminController {
   constructor(
+    private readonly adminMediaService: AdminMediaService,
     private readonly categoriesService: CategoriesService,
     private readonly ordersService: OrdersService,
     private readonly productsService: ProductsService,
@@ -49,6 +84,25 @@ export class AdminController {
   @Patch('categories/:id')
   updateCategory(@Param('id') id: string, @Body() body: unknown) {
     return this.categoriesService.updateAdmin(id, body ?? {});
+  }
+
+  @Post('uploads/image')
+  @UseInterceptors(
+    FileInterceptor('image', {
+      fileFilter: adminImageUploadFileFilter,
+      limits: {
+        fileSize: MAX_ADMIN_IMAGE_UPLOAD_SIZE_BYTES,
+        files: 1,
+      },
+    }),
+  )
+  uploadImage(@UploadedFile() file: UploadedAdminImageFile) {
+    return this.adminMediaService.uploadHomepagePromoImage(file);
+  }
+
+  @Delete('categories/:id/permanent')
+  deleteCategoryPermanently(@Param('id') id: string) {
+    return this.categoriesService.deletePermanentAdmin(id);
   }
 
   @Delete('categories/:id')

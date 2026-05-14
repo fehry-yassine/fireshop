@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type {
+  ChangeEvent,
+  Dispatch,
+  FormEvent,
+  ReactNode,
+  SetStateAction,
+} from "react";
 import { AdminAccessGate } from "@/components/admin/AdminAccessGate";
 import { AdminDashboardFrame } from "@/components/admin/AdminDashboardFrame";
 import { getErrorMessage } from "@/components/admin/adminUtils";
@@ -41,7 +47,7 @@ type PromoPanelState =
 
 type PromoPreviewData = Pick<
   PromoDraft,
-  "imageUrl" | "isActive" | "linkUrl" | "sortOrder" | "subtitle" | "title" | "type"
+  "imageUrl" | "isActive" | "linkUrl" | "subtitle" | "title" | "type"
 >;
 
 const promoTypes: Array<{ description: string; label: string; value: HomepagePromoType }> = [
@@ -322,7 +328,7 @@ function AdminHomepagePromosContent() {
       )}
 
       <DashboardDrawer
-        description="Compose the content, target URL, ordering, and live preview used by homepage discovery."
+        description="Compose the artwork, target URL, and live preview used by homepage discovery."
         eyebrow="Homepage discovery control"
         footer={
           <div className="mx-auto flex max-w-6xl justify-end gap-2">
@@ -459,6 +465,7 @@ function PromoManagementCard({
   variant: "card" | "hero";
 }) {
   const isWorking = activePromoId === promo.id;
+  const title = promo.title.trim();
 
   return (
     <div className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.055)] transition duration-200 hover:-translate-y-0.5 hover:border-market-200 hover:shadow-[0_20px_45px_rgba(255,106,45,0.10)]">
@@ -467,7 +474,6 @@ function PromoManagementCard({
           imageUrl: promo.imageUrl ?? "",
           isActive: promo.isActive,
           linkUrl: promo.linkUrl,
-          sortOrder: String(promo.sortOrder ?? 0),
           subtitle: promo.subtitle ?? "",
           title: promo.title,
           type: promo.type,
@@ -479,7 +485,9 @@ function PromoManagementCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h4 className="line-clamp-2 font-bold text-slate-950">{promo.title}</h4>
+              <h4 className="line-clamp-2 font-bold text-slate-950">
+                {title || "Image-only promo"}
+              </h4>
               <StatusBadge isActive={promo.isActive} />
             </div>
             {promo.subtitle ? (
@@ -488,9 +496,6 @@ function PromoManagementCard({
               </p>
             ) : null}
           </div>
-          <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
-            #{promo.sortOrder}
-          </span>
         </div>
 
         <p className="break-all rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 text-xs font-semibold text-slate-500">
@@ -538,9 +543,41 @@ function PromoFormPanel({
 }: {
   draft: PromoDraft;
   message: PromoMessage | null;
-  onDraftChange: (draft: PromoDraft) => void;
+  onDraftChange: Dispatch<SetStateAction<PromoDraft>>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const recommendation =
+    draft.type === "HERO_SLIDE"
+      ? "Hero slide recommendation: wide image, 1200x600."
+      : "Promo card recommendation: square image, 800x800.";
+
+  async function handleImageFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setUploadError(null);
+
+    try {
+      const response = await api.admin.uploads.image(file);
+      onDraftChange((current) => ({
+        ...current,
+        imageUrl: response.url,
+      }));
+    } catch (error) {
+      setUploadError(getErrorMessage(error, "Could not upload promo image."));
+    } finally {
+      setIsUploadingImage(false);
+    }
+  }
+
   return (
     <form
       className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_420px]"
@@ -555,7 +592,7 @@ function PromoFormPanel({
             <div>
               <h4 className="font-bold text-slate-950">Promo content</h4>
               <p className="mt-1 text-sm text-slate-500">
-                Image upload is not part of V1; paste an existing safe image URL.
+                Upload the artwork shoppers will see on homepage promo cards and hero slides.
               </p>
             </div>
 
@@ -566,56 +603,94 @@ function PromoFormPanel({
               />
             </Field>
 
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_150px]">
-              <Field label="Title" name="promo-title">
-                <Input
-                  className="h-11 border-slate-200 shadow-sm shadow-slate-200/50"
-                  id="promo-title"
-                  onChange={(event) =>
-                    onDraftChange({ ...draft, title: event.target.value })
-                  }
-                  placeholder="Weekend tech offers"
-                  required
-                  value={draft.title}
-                />
-              </Field>
-              <Field label="Sort order" name="promo-sort-order">
-                <Input
-                  className="h-11 border-slate-200 shadow-sm shadow-slate-200/50"
-                  id="promo-sort-order"
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    onDraftChange({ ...draft, sortOrder: event.target.value })
-                  }
-                  type="number"
-                  value={draft.sortOrder}
-                />
-              </Field>
-            </div>
-
-            <Field label="Subtitle" name="promo-subtitle">
-              <Input
-                className="h-11 border-slate-200 shadow-sm shadow-slate-200/50"
-                id="promo-subtitle"
-                onChange={(event) =>
-                  onDraftChange({ ...draft, subtitle: event.target.value })
-                }
-                placeholder="Optional supporting text"
-                value={draft.subtitle}
-              />
+            <Field
+              helperText={recommendation}
+              label="Promo image"
+              name="promo-image-upload"
+            >
+              <div className="overflow-hidden rounded-lg border border-dashed border-market-200 bg-gradient-to-br from-white to-market-50/60 p-3">
+                <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center">
+                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <PromoVisual
+                      data={draft}
+                      variant={draft.type === "HERO_SLIDE" ? "hero" : "card"}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">
+                        Upload homepage artwork
+                      </p>
+                      <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+                        JPEG, PNG, WebP, or GIF. Max 5MB.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        className="h-9 bg-gradient-to-r from-market-700 to-orange-500 px-3 shadow-md shadow-market-600/20 hover:from-market-800 hover:to-orange-600"
+                        disabled={isUploadingImage}
+                        onClick={() => fileInputRef.current?.click()}
+                        type="button"
+                      >
+                        {isUploadingImage ? "Uploading" : "Upload image"}
+                      </Button>
+                      {draft.imageUrl ? (
+                        <Button
+                          className="h-9 border-slate-200 px-3"
+                          disabled={isUploadingImage}
+                          onClick={() =>
+                            onDraftChange((current) => ({
+                              ...current,
+                              imageUrl: "",
+                            }))
+                          }
+                          type="button"
+                          variant="secondary"
+                        >
+                          Remove
+                        </Button>
+                      ) : null}
+                    </div>
+                    <input
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageFileChange}
+                      ref={fileInputRef}
+                      type="file"
+                    />
+                    {draft.imageUrl ? (
+                      <p className="break-all rounded-lg bg-white/80 px-2.5 py-2 text-xs font-semibold text-slate-500">
+                        {draft.imageUrl}
+                      </p>
+                    ) : null}
+                    {uploadError ? (
+                      <p className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-semibold text-red-700">
+                        {uploadError}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             </Field>
 
-            <Field label="Image URL" name="promo-image-url">
-              <Input
-                className="h-11 border-slate-200 shadow-sm shadow-slate-200/50"
-                id="promo-image-url"
-                onChange={(event) =>
-                  onDraftChange({ ...draft, imageUrl: event.target.value })
-                }
-                placeholder="Optional: /api/uploads/... or https://..."
-                value={draft.imageUrl}
-              />
-            </Field>
+            <details className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+              <summary className="cursor-pointer text-sm font-bold text-slate-800">
+                Advanced: paste image URL
+              </summary>
+              <div className="mt-3">
+                <Field label="Image URL" name="promo-image-url">
+                  <Input
+                    className="h-11 border-slate-200 bg-white shadow-sm shadow-slate-200/50"
+                    id="promo-image-url"
+                    onChange={(event) =>
+                      onDraftChange({ ...draft, imageUrl: event.target.value })
+                    }
+                    placeholder="Optional: /api/uploads/... or https://..."
+                    value={draft.imageUrl}
+                  />
+                </Field>
+              </div>
+            </details>
 
             <Field
               helperText="Use /categories/slug, /product/slug, /search, or a full HTTP(S) URL."
@@ -634,6 +709,34 @@ function PromoFormPanel({
               />
             </Field>
 
+            <Field
+              helperText="Leave empty if the image already includes text."
+              label="Optional title"
+              name="promo-title"
+            >
+              <Input
+                className="h-11 border-slate-200 shadow-sm shadow-slate-200/50"
+                id="promo-title"
+                onChange={(event) =>
+                  onDraftChange({ ...draft, title: event.target.value })
+                }
+                placeholder="Optional title"
+                value={draft.title}
+              />
+            </Field>
+
+            <Field label="Optional subtitle" name="promo-subtitle">
+              <Input
+                className="h-11 border-slate-200 shadow-sm shadow-slate-200/50"
+                id="promo-subtitle"
+                onChange={(event) =>
+                  onDraftChange({ ...draft, subtitle: event.target.value })
+                }
+                placeholder="Optional supporting text"
+                value={draft.subtitle}
+              />
+            </Field>
+
             <ActiveToggle
               checked={draft.isActive}
               label="Active"
@@ -649,7 +752,7 @@ function PromoFormPanel({
         <div>
           <p className="text-sm font-bold text-slate-800">Live preview</p>
           <p className="mt-1 text-xs font-medium text-slate-500">
-            Updates while you type. Fallback art appears when no image URL is provided.
+            Updates while you type. Image-only promos stay focused on the artwork.
           </p>
         </div>
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
@@ -663,9 +766,6 @@ function PromoFormPanel({
                 {draft.type}
               </Badge>
               <StatusBadge isActive={draft.isActive} />
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
-                #{draft.sortOrder || "0"}
-              </span>
             </div>
             <p className="break-all rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 text-xs font-semibold text-slate-500">
               {draft.linkUrl || "No link URL yet"}
@@ -687,6 +787,9 @@ function PromoVisual({
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = data.imageUrl.trim();
   const showImage = imageUrl.length > 0 && !imageFailed;
+  const title = data.title.trim();
+  const subtitle = data.subtitle.trim();
+  const hasTextOverlay = title.length > 0 || subtitle.length > 0;
 
   useEffect(() => {
     setImageFailed(false);
@@ -702,24 +805,30 @@ function PromoVisual({
       {showImage ? (
         <>
           <img
-            alt={data.title || "Homepage promo preview"}
+            alt={title || "Homepage promo preview"}
             className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
             onError={() => setImageFailed(true)}
             src={imageUrl}
           />
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/82 via-slate-950/40 to-transparent p-4 text-white">
-            <p
-              className={cn(
-                "line-clamp-2 font-black leading-tight",
-                variant === "hero" ? "text-2xl" : "text-lg",
-              )}
-            >
-              {data.title.trim() || "FireShop promo"}
-            </p>
-            <p className="mt-1 line-clamp-1 text-xs font-semibold text-white/80">
-              {data.subtitle.trim() || data.linkUrl || "Marketplace discovery"}
-            </p>
-          </div>
+          {hasTextOverlay ? (
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/82 via-slate-950/40 to-transparent p-4 text-white">
+              {title ? (
+                <p
+                  className={cn(
+                    "line-clamp-2 font-black leading-tight",
+                    variant === "hero" ? "text-2xl" : "text-lg",
+                  )}
+                >
+                  {title}
+                </p>
+              ) : null}
+              {subtitle ? (
+                <p className="mt-1 line-clamp-1 text-xs font-semibold text-white/80">
+                  {subtitle}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </>
       ) : (
         <FallbackPromoVisual data={data} variant={variant} />
@@ -735,6 +844,10 @@ function FallbackPromoVisual({
   data: PromoPreviewData;
   variant: "card" | "hero";
 }) {
+  const title = data.title.trim();
+  const subtitle = data.subtitle.trim();
+  const hasText = title.length > 0 || subtitle.length > 0;
+
   return (
     <div
       className={cn(
@@ -751,17 +864,39 @@ function FallbackPromoVisual({
         </span>
       </div>
       <div className={cn(variant === "hero" ? "max-w-[78%]" : "max-w-[86%]")}>
-        <p
-          className={cn(
-            "line-clamp-2 font-black leading-tight text-slate-950",
-            variant === "hero" ? "text-2xl" : "text-lg",
-          )}
-        >
-          {data.title.trim() || "FireShop promo"}
-        </p>
-        <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-600">
-          {data.subtitle.trim() || "Marketplace discovery"}
-        </p>
+        {hasText ? (
+          <>
+            {title ? (
+              <p
+                className={cn(
+                  "line-clamp-2 font-black leading-tight text-slate-950",
+                  variant === "hero" ? "text-2xl" : "text-lg",
+                )}
+              >
+                {title}
+              </p>
+            ) : null}
+            {subtitle ? (
+              <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-600">
+                {subtitle}
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <p
+              className={cn(
+                "line-clamp-2 font-black leading-tight text-slate-950",
+                variant === "hero" ? "text-2xl" : "text-lg",
+              )}
+            >
+              Promo image preview
+            </p>
+            <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-600">
+              Upload artwork or paste an image URL.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
@@ -879,7 +1014,7 @@ function DeletePromoDialog({
               This cannot be undone. The existing backend delete endpoint removes it from the managed homepage flow.
             </p>
             <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-              {promo.title}
+              {promo.title.trim() || "Image-only promo"}
             </p>
           </div>
         </div>
@@ -1149,10 +1284,6 @@ function draftToPayload(draft: PromoDraft): HomepagePromoPayload {
 }
 
 function validatePayload(payload: HomepagePromoPayload) {
-  if (!payload.title.trim()) {
-    return "Title is required.";
-  }
-
   if (!payload.linkUrl.trim()) {
     return "Link URL is required.";
   }
