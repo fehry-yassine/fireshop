@@ -9,6 +9,7 @@ import {
 import {
   CartItem,
   Category,
+  NotificationType,
   Order,
   OrderItem,
   OrderStatus,
@@ -23,6 +24,8 @@ import {
   VendorStatus,
 } from '@prisma/client';
 import { AuthTokenPayload } from '../auth/auth.types';
+import { EmailService } from '../notifications/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { toPublicUser } from '../users/public-user';
 
@@ -138,7 +141,11 @@ const MAX_LIMIT = 100;
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async checkout(currentUser: AuthTokenPayload, payload: unknown) {
     const user = await this.findActiveUser(currentUser.sub);
@@ -260,6 +267,36 @@ export class OrdersService {
 
       return createdOrder;
     });
+
+    // Fire-and-forget — never block the response on notification/email failures
+    void this.notificationsService
+      .create(
+        order.buyerId,
+        NotificationType.ORDER_PLACED,
+        'Commande passée',
+        `Votre commande auprès de ${order.vendor.storeName} a bien été reçue.`,
+        { orderId: order.id },
+      )
+      .catch((err) => console.error('[notify] checkout buyer:', err));
+
+    void this.notificationsService
+      .create(
+        order.vendor.userId,
+        NotificationType.NEW_ORDER_RECEIVED,
+        'Nouvelle commande reçue',
+        `Vous avez reçu une nouvelle commande.`,
+        { orderId: order.id },
+      )
+      .catch((err) => console.error('[notify] checkout vendor:', err));
+
+    void this.emailService
+      .sendOrderPlacedEmail(
+        order.buyer.email,
+        order.id,
+        order.vendor.storeName,
+        this.money(Number(order.total)),
+      )
+      .catch((err) => console.error('[email] checkout:', err));
 
     return { order: this.toOrderResponse(order) };
   }
@@ -656,6 +693,10 @@ export class OrdersService {
       return savedOrder;
     });
 
+    if (statusChanged && nextStatus) {
+      this.scheduleOrderStatusNotification(updatedOrder, nextStatus);
+    }
+
     return { order: this.toOrderResponse(updatedOrder) };
   }
 
@@ -724,6 +765,32 @@ export class OrdersService {
       actorUserId: currentUser?.sub,
       action: 'ADMIN_ORDER_STATUS_CHANGED',
     });
+  }
+
+  private scheduleOrderStatusNotification(
+    order: OrderWithRelations,
+    nextStatus: OrderStatus,
+  ) {
+    const isCancellation = nextStatus === OrderStatus.CANCELLED;
+    const type = isCancellation
+      ? NotificationType.ORDER_CANCELLED
+      : NotificationType.ORDER_STATUS_CHANGED;
+    const title = isCancellation ? 'Commande annulée' : 'Statut mis à jour';
+    const body = isCancellation
+      ? 'Votre commande a été annulée.'
+      : `Votre commande est maintenant : ${nextStatus}.`;
+
+    void this.notificationsService
+      .create(order.buyerId, type, title, body, {
+        orderId: order.id,
+        previousStatus: order.status,
+        nextStatus,
+      })
+      .catch((err) => console.error('[notify] order status:', err));
+
+    void this.emailService
+      .sendOrderStatusEmail(order.buyer.email, order.id, nextStatus)
+      .catch((err) => console.error('[email] order status:', err));
   }
 
   private async updateOrderStatus(
@@ -795,6 +862,8 @@ export class OrdersService {
         include: this.orderInclude(),
       });
     });
+
+    this.scheduleOrderStatusNotification(updatedOrder, nextStatus);
 
     return { order: this.toOrderResponse(updatedOrder) };
   }

@@ -9,6 +9,7 @@ import { CartModule } from './cart/cart.module';
 import { CategoriesModule } from './categories/categories.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HomepagePromosModule } from './homepage-promos/homepage-promos.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
@@ -33,6 +34,7 @@ import { VendorsModule } from './vendors/vendors.module';
     OrdersModule,
     AdminModule,
     HomepagePromosModule,
+    NotificationsModule,
     DashboardModule,
   ],
   controllers: [AppController],

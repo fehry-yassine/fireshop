@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   Category,
+  NotificationType,
   Product,
   ProductImage,
   ProductStatus,
@@ -17,6 +18,8 @@ import {
   VendorStatus,
 } from '@prisma/client';
 import { AuthTokenPayload } from '../auth/auth.types';
+import { EmailService } from '../notifications/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type AdminProductRejectPayload = {
@@ -35,7 +38,11 @@ type ProductWithRelations = Product & {
 
 @Injectable()
 export class ProductLifecycleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async publishVendorProduct(currentUser: AuthTokenPayload, id: string) {
     const vendor = await this.findActiveVendorForUser(currentUser);
@@ -81,7 +88,7 @@ export class ProductLifecycleService {
 
     this.ensureProductCanBePublished(product);
 
-    return this.prisma.$transaction(async (tx) => {
+    const approved = await this.prisma.$transaction(async (tx) => {
       const updatedProduct = await tx.product.update({
         where: { id: product.id },
         data: {
@@ -107,6 +114,22 @@ export class ProductLifecycleService {
 
       return updatedProduct;
     });
+
+    void this.notificationsService
+      .create(
+        product.vendor.userId,
+        NotificationType.PRODUCT_APPROVED,
+        'Produit approuvé',
+        `Votre produit "${product.name}" a été approuvé et est maintenant visible.`,
+        { productId: product.id, productName: product.name },
+      )
+      .catch((err) => console.error('[notify] product approved:', err));
+
+    void this.emailService
+      .sendProductApprovedEmail(product.vendor.user.email, product.name)
+      .catch((err) => console.error('[email] product approved:', err));
+
+    return approved;
   }
 
   async rejectProductAdmin(
@@ -114,7 +137,7 @@ export class ProductLifecycleService {
     payload: unknown,
     currentUser?: AuthTokenPayload,
   ) {
-    const product = await this.findProductByIdOrThrow(id);
+    const product = await this.findProductWithRelationsByIdOrThrow(id);
     const body = this.asAdminRejectPayload(payload);
     const reason = this.requiredString(body.reason, 'reason');
 
@@ -122,7 +145,7 @@ export class ProductLifecycleService {
       throw new ConflictException('Archived products cannot be rejected');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const rejected = await this.prisma.$transaction(async (tx) => {
       const updatedProduct = await tx.product.update({
         where: { id: product.id },
         data: {
@@ -149,6 +172,22 @@ export class ProductLifecycleService {
 
       return updatedProduct;
     });
+
+    void this.notificationsService
+      .create(
+        product.vendor.userId,
+        NotificationType.PRODUCT_REJECTED,
+        'Produit non approuvé',
+        `Votre produit "${product.name}" n'a pas été approuvé. Motif : ${reason}`,
+        { productId: product.id, productName: product.name, reason },
+      )
+      .catch((err) => console.error('[notify] product rejected:', err));
+
+    void this.emailService
+      .sendProductRejectedEmail(product.vendor.user.email, product.name, reason)
+      .catch((err) => console.error('[email] product rejected:', err));
+
+    return rejected;
   }
 
   async archiveProductAdmin(id: string) {

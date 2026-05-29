@@ -330,3 +330,33 @@ export type VendorOrderUpsertPayload = {
   productId?: string;
   quantity?: number;
 };
+
+export type NotificationType =
+  | "ORDER_PLACED"
+  | "ORDER_STATUS_CHANGED"
+  | "ORDER_CANCELLED"
+  | "PRODUCT_APPROVED"
+  | "PRODUCT_REJECTED"
+  | "VENDOR_APPLICATION_APPROVED"
+  | "VENDOR_APPLICATION_REJECTED"
+  | "NEW_ORDER_RECEIVED"
+  | "NEW_VENDOR_APPLICATION";
+
+export type Notification = {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  metadata?: Record<string, unknown> | null;
+  isRead: boolean;
+  createdAt: string;
+};
+
+export type NotificationsResponse = {
+  items: Notification[];
+  pagination: Pagination;
+};
+
+export type UnreadCountResponse = {
+  count: number;
+};

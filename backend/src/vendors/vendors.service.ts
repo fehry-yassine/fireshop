@@ -6,8 +6,10 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Prisma, Role, User, Vendor, VendorStatus } from '@prisma/client';
+import { NotificationType, Prisma, Role, User, Vendor, VendorStatus } from '@prisma/client';
 import { AuthTokenPayload } from '../auth/auth.types';
+import { EmailService } from '../notifications/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { toPublicUser } from '../users/public-user';
 
@@ -27,7 +29,11 @@ type VendorWithUser = Vendor & { user: User };
 
 @Injectable()
 export class VendorsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async apply(currentUser: AuthTokenPayload, payload: unknown) {
     const body = this.asPayload(payload);
@@ -74,10 +80,37 @@ export class VendorsService {
             include: { user: true },
           });
 
+      // Notify all admins — fire-and-forget after the main transaction
+      void this.notifyAdminsNewApplication(application.id, data.storeName, user.id)
+        .catch((err) => console.error('[notify] vendor apply:', err));
+
       return { application: this.toApplication(application) };
     } catch (error) {
       this.handlePrismaError(error);
     }
+  }
+
+  private async notifyAdminsNewApplication(
+    vendorId: string,
+    storeName: string,
+    applicantUserId: string,
+  ) {
+    const admins = await this.prisma.user.findMany({
+      where: { role: Role.ADMIN, isActive: true },
+      select: { id: true },
+    });
+
+    await Promise.all(
+      admins.map((admin) =>
+        this.notificationsService.create(
+          admin.id,
+          NotificationType.NEW_VENDOR_APPLICATION,
+          'Nouvelle candidature vendeur',
+          `${storeName} a soumis une candidature vendeur.`,
+          { vendorId, storeName, applicantUserId },
+        ),
+      ),
+    );
   }
 
   async findMyApplication(currentUser: AuthTokenPayload) {
@@ -207,6 +240,20 @@ export class VendorsService {
       return updatedVendor;
     });
 
+    void this.notificationsService
+      .create(
+        vendor.userId,
+        NotificationType.VENDOR_APPLICATION_APPROVED,
+        'Candidature approuvée',
+        'Votre candidature vendeur a été approuvée. Vous pouvez maintenant publier des produits.',
+        { vendorId: vendor.id },
+      )
+      .catch((err) => console.error('[notify] vendor approved:', err));
+
+    void this.emailService
+      .sendVendorApprovedEmail(vendor.user.email, vendor.storeName)
+      .catch((err) => console.error('[email] vendor approved:', err));
+
     return { vendor: this.toAdminVendor(vendor) };
   }
 
@@ -254,6 +301,22 @@ export class VendorsService {
 
       return updatedVendor;
     });
+
+    void this.notificationsService
+      .create(
+        vendor.userId,
+        NotificationType.VENDOR_APPLICATION_REJECTED,
+        'Candidature non approuvée',
+        adminNote
+          ? `Votre candidature vendeur n'a pas été approuvée. Motif : ${adminNote}`
+          : "Votre candidature vendeur n'a pas été approuvée.",
+        { vendorId: vendor.id, adminNote },
+      )
+      .catch((err) => console.error('[notify] vendor rejected:', err));
+
+    void this.emailService
+      .sendVendorRejectedEmail(vendor.user.email, vendor.storeName, adminNote ?? '')
+      .catch((err) => console.error('[email] vendor rejected:', err));
 
     return { application: this.toApplication(vendor) };
   }

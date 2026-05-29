@@ -258,7 +258,7 @@ function AdminHomepagePromosContent() {
   const panelMessage = getPanelMessage(panelState, message);
 
   return (
-    <div className="space-y-6">
+    <div className="admin-page-shell">
       <PremiumPageHeader
         actionLabel="Create promo"
         eyebrow="Marketplace homepage"
@@ -271,7 +271,7 @@ function AdminHomepagePromosContent() {
         <InlineMessage message={message} />
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="admin-kpi-grid">
         <MetricCard
           icon={<CardIcon />}
           label="Active promo cards"
@@ -299,7 +299,7 @@ function AdminHomepagePromosContent() {
       ) : promos.length === 0 ? (
         <EmptyDiscoveryState onCreate={openCreatePanel} />
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(390px,0.82fr)]">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(390px,0.82fr)]">
           <PromoSection
             activePromoId={activePromoId}
             emptyText="No middle promo cards yet. The homepage can keep using fallback visuals until you add one."
@@ -400,14 +400,14 @@ function PromoSection({
   variant: "card" | "hero";
 }) {
   return (
-    <Card className="overflow-hidden border-slate-200/90 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
-      <CardContent className="space-y-4 p-4 sm:p-5">
+    <Card className="admin-surface-card">
+      <CardContent className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-market-700">
               {variant === "card" ? "Discovery grid" : "Homepage slideshow"}
             </p>
-            <h3 className="mt-1 text-xl font-black text-slate-950">{title}</h3>
+            <h3 className="mt-1 text-lg font-black text-slate-950">{title}</h3>
             <p className="mt-1 text-sm text-slate-500">
               {variant === "card"
                 ? "Preview cards similar to the public middle promo area."
@@ -468,7 +468,7 @@ function PromoManagementCard({
   const title = promo.title.trim();
 
   return (
-    <div className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.055)] transition duration-200 hover:-translate-y-0.5 hover:border-market-200 hover:shadow-[0_20px_45px_rgba(255,106,45,0.10)]">
+    <div className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_22px_rgba(15,23,42,0.045)] transition duration-200 hover:border-market-200 hover:shadow-[0_14px_32px_rgba(255,106,45,0.08)]">
       <PromoVisual
         data={{
           imageUrl: promo.imageUrl ?? "",
@@ -481,7 +481,7 @@ function PromoManagementCard({
         variant={variant}
       />
 
-      <div className="space-y-3 p-4">
+      <div className="space-y-2.5 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -503,12 +503,12 @@ function PromoManagementCard({
         </p>
 
         <div className="flex flex-wrap justify-end gap-2">
-          <Button className="h-9 border-slate-200 px-3" onClick={onEdit} variant="secondary">
+          <Button className="h-8 border-slate-200 px-2.5 text-xs" onClick={onEdit} variant="secondary">
             Edit
           </Button>
           <Button
             className={cn(
-              "h-9 px-3",
+              "h-8 px-2.5 text-xs",
               promo.isActive
                 ? "text-red-700 hover:bg-red-50 hover:text-red-800"
                 : "bg-gradient-to-r from-market-700 to-orange-500 shadow-md shadow-market-600/20",
@@ -520,7 +520,7 @@ function PromoManagementCard({
             {isWorking ? "Saving" : promo.isActive ? "Disable" : "Enable"}
           </Button>
           <Button
-            className="h-9 border-red-200 bg-red-50 px-3 text-red-700 shadow-none hover:border-red-300 hover:bg-red-100 hover:text-red-800"
+            className="h-8 border-red-200 bg-red-50 px-2.5 text-xs text-red-700 shadow-none hover:border-red-300 hover:bg-red-100 hover:text-red-800"
             disabled={isWorking}
             onClick={onDelete}
             variant="secondary"
@@ -952,29 +952,24 @@ function PremiumPageHeader({
   title: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-market-100 bg-gradient-to-br from-white via-white to-market-50 p-5 shadow-[0_22px_60px_rgba(15,23,42,0.08)] sm:p-6">
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-market-700 via-orange-500 to-amber-300" />
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="admin-page-header">
         <div className="space-y-2">
-          <span className="inline-flex rounded-full border border-market-200 bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-market-800 shadow-sm shadow-market-100/60">
-            {eyebrow}
-          </span>
+          <p className="admin-page-eyebrow">{eyebrow}</p>
           <div>
-            <h2 className="text-3xl font-black leading-tight text-slate-950 sm:text-4xl">
+            <h2 className="admin-page-title">
               {title}
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            <p className="admin-page-description">
               {subtitle}
             </p>
           </div>
         </div>
         <Button
-          className="h-11 bg-gradient-to-r from-market-700 to-orange-500 px-5 shadow-lg shadow-market-600/20 hover:from-market-800 hover:to-orange-600"
+          className="h-10 bg-gradient-to-r from-market-700 to-orange-500 px-4 shadow-lg shadow-market-600/20 hover:from-market-800 hover:to-orange-600"
           onClick={onAction}
         >
           {actionLabel}
         </Button>
-      </div>
     </div>
   );
 }
@@ -1061,18 +1056,16 @@ function MetricCard({
   }[tone];
 
   return (
-    <Card className="overflow-hidden border-slate-200/90 bg-gradient-to-br from-white to-slate-50/80 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
-      <CardContent className="space-y-4 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-600">{label}</p>
-            <p className="mt-1 text-xs font-semibold text-slate-400">{meta}</p>
-          </div>
-          <span className={cn("inline-flex h-10 w-10 items-center justify-center rounded-lg border", toneClass)}>
-            {icon}
-          </span>
+    <Card className="admin-kpi-card">
+      <CardContent className="admin-kpi-card-content">
+        <div>
+          <p className="admin-kpi-label">{label}</p>
+          <p className="admin-kpi-hint">{meta}</p>
+          <p className="admin-kpi-value">{value}</p>
         </div>
-        <p className="text-3xl font-black leading-none text-slate-950">{value}</p>
+        <span className={cn("inline-flex h-10 w-10 items-center justify-center rounded-lg border", toneClass)}>
+          {icon}
+        </span>
       </CardContent>
     </Card>
   );

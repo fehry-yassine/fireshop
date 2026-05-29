@@ -3,8 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { PublicUser } from "@/types";
@@ -29,11 +30,15 @@ type BackofficeFrameProps = {
   topBadgeLabel: string;
   supportText: string;
   user?: PublicUser;
+  workspaceDisabledActionLabel?: string;
+  workspacePanelTitle?: string;
 };
 
 type VendorTheme = "dark" | "light";
 
 const VENDOR_THEME_STORAGE_KEY = "fireshop-vendor-theme";
+const FIRESHOP_SIDEBAR_GRID_CLASS = "lg:grid-cols-[240px_minmax(0,1fr)]";
+const DEFAULT_SIDEBAR_GRID_CLASS = "lg:grid-cols-[248px_minmax(0,1fr)]";
 
 export function BackofficeFrame({
   brand = "default",
@@ -48,6 +53,8 @@ export function BackofficeFrame({
   topBadgeLabel,
   supportText,
   user,
+  workspaceDisabledActionLabel,
+  workspacePanelTitle,
 }: BackofficeFrameProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -56,7 +63,11 @@ export function BackofficeFrame({
   const initial = accountName.trim().charAt(0).toUpperCase() || "S";
   const [vendorTheme, setVendorTheme] = useState<VendorTheme>("dark");
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const workspaceSelectorRef = useRef<HTMLDivElement | null>(null);
+  const workspaceSelectorTitle = workspacePanelTitle ?? (user ? "Stores" : "Workspaces");
+  const workspacePanelId = "fireshop-workspace-selector";
 
   useEffect(() => {
     if (!isFireShop) {
@@ -69,6 +80,33 @@ export function BackofficeFrame({
       setVendorTheme(storedTheme);
     }
   }, [isFireShop]);
+
+  useEffect(() => {
+    if (!isWorkspaceMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        workspaceSelectorRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+
+      setIsWorkspaceMenuOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [isWorkspaceMenuOpen]);
+
+  useEffect(() => {
+    setIsWorkspaceMenuOpen(false);
+  }, [pathname]);
 
   function toggleVendorTheme() {
     setVendorTheme((currentTheme) => {
@@ -105,65 +143,143 @@ export function BackofficeFrame({
       <div
         className={cn(
           "grid min-h-screen lg:h-screen",
-          isFireShop
-            ? "lg:grid-cols-[252px_minmax(0,1fr)]"
-            : "lg:grid-cols-[248px_minmax(0,1fr)]",
+          isFireShop ? FIRESHOP_SIDEBAR_GRID_CLASS : DEFAULT_SIDEBAR_GRID_CLASS,
         )}
       >
         <aside
           className={cn(
-            "overflow-hidden p-2.5 text-white lg:h-screen",
+            "overflow-hidden p-2 text-white lg:h-screen",
             isFireShop
               ? "vendor-sidebar"
               : "bg-[#311552]",
           )}
         >
           <div className="flex h-full min-h-0 flex-col">
-            <div className="shrink-0 px-2 pb-1 pt-2">
+            <div className="shrink-0 px-1 pb-0 pt-1">
               {isFireShop ? (
-                <div className="vendor-logo-tile relative mx-auto h-24 w-full max-w-[188px]">
+                <div className="vendor-logo-tile relative mx-auto h-[58px] w-full max-w-[148px]">
                   <Image
                     alt={logoAlt ?? "FireShop workspace"}
                     className="object-contain"
                     fill
                     priority
-                    sizes="188px"
+                    sizes="148px"
                     src={logoSrc ?? "/branding/fireshop-logo.png"}
                   />
                 </div>
               ) : null}
             </div>
 
-            <div
-              className={cn(
-                "mx-1.5 mt-1.5 shrink-0 border px-3 py-2.5",
-                isFireShop
-                  ? "vendor-identity-card"
-                  : "border-white/10 bg-[#8e43db]",
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p
-                  className={cn(
-                    "text-[10px] font-bold uppercase tracking-[0.12em]",
-                    isFireShop ? "vendor-accent-text" : "text-purple-100",
-                  )}
-                >
-                  {panelLabel}
-                </p>
-                <span className={cn("text-[10px] font-semibold", isFireShop ? "vendor-subtle" : "text-purple-200")}>
-                  Workspace
+            <div className="relative mx-1 mt-1 shrink-0" ref={workspaceSelectorRef}>
+              <button
+                aria-controls={workspacePanelId}
+                aria-expanded={isWorkspaceMenuOpen}
+                className={cn(
+                  "vendor-identity-card vendor-workspace-trigger w-full border px-2.5 py-2 text-left",
+                  isWorkspaceMenuOpen ? "vendor-workspace-trigger-open" : undefined,
+                  isFireShop
+                    ? undefined
+                    : "border-white/10 bg-[#8e43db]",
+                )}
+                onClick={() => setIsWorkspaceMenuOpen((isOpen) => !isOpen)}
+                type="button"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="min-w-0">
+                    <span
+                      className={cn(
+                        "vendor-workspace-label inline-flex min-w-0 max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-bold leading-5",
+                        isFireShop ? undefined : "bg-white/10 text-purple-100",
+                      )}
+                    >
+                      {panelLabel}
+                    </span>
+                    <span className="vendor-title mt-1.5 block truncate text-[15px] font-extrabold leading-tight">
+                      {panelTitle}
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "vendor-workspace-cue inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-transform duration-200",
+                      isWorkspaceMenuOpen ? "rotate-180" : undefined,
+                    )}
+                  >
+                    <ChevronDownIcon />
+                  </span>
                 </span>
+              </button>
+
+              <div
+                aria-hidden={!isWorkspaceMenuOpen}
+                className={cn(
+                  "vendor-workspace-panel absolute left-0 right-0 top-[calc(100%+5px)] z-30 origin-top rounded-md border p-1 transition-all duration-150 ease-out",
+                  isWorkspaceMenuOpen
+                    ? "translate-y-0 scale-100 opacity-100"
+                    : "pointer-events-none -translate-y-1 scale-[0.98] opacity-0",
+                )}
+                id={workspacePanelId}
+              >
+                <div className="flex items-center justify-between gap-2 px-1.5 pb-0.5">
+                  <p className="vendor-panel-title text-[10px] font-extrabold">
+                    {workspaceSelectorTitle}
+                  </p>
+                  <button
+                    aria-label="Close workspace selector"
+                    className="vendor-workspace-close inline-flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-bold"
+                    onClick={() => setIsWorkspaceMenuOpen(false)}
+                    tabIndex={isWorkspaceMenuOpen ? 0 : -1}
+                    type="button"
+                  >
+                    x
+                  </button>
+                </div>
+                <div className="space-y-0.5">
+                  <button
+                    className="vendor-workspace-row vendor-workspace-row-selected flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left"
+                    onClick={() => setIsWorkspaceMenuOpen(false)}
+                    tabIndex={isWorkspaceMenuOpen ? 0 : -1}
+                    type="button"
+                  >
+                    <span className="vendor-workspace-mark inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
+                      <WorkspaceFlameIcon />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="vendor-title block truncate text-[12px] font-bold leading-4">
+                        {panelTitle}
+                      </span>
+                      <span className="vendor-muted block truncate text-[10px] font-medium leading-[14px]">
+                        {panelSubtitle}
+                      </span>
+                    </span>
+                    <span className="vendor-workspace-check inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full">
+                      <CheckIcon />
+                    </span>
+                  </button>
+
+                  {workspaceDisabledActionLabel ? (
+                    <div className="vendor-workspace-row vendor-workspace-row-disabled flex items-center gap-1.5 rounded-md px-1.5 py-1">
+                      <span className="vendor-workspace-mark inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
+                        <PlusIcon />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[11px] font-bold leading-4">
+                          {workspaceDisabledActionLabel}
+                        </span>
+                        <span className="block truncate text-[10px] font-medium leading-[14px]">
+                          Future workspace
+                        </span>
+                      </span>
+                      <span className="vendor-workspace-soon shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold">
+                        Soon
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
               </div>
-              <p className="vendor-title mt-1.5 min-w-0 break-words text-[1.08rem] font-extrabold leading-tight">
-                {panelTitle}
-              </p>
-              <p className={cn("mt-1 truncate text-[12px]", isFireShop ? "vendor-muted" : "text-purple-100")}>
-                {panelSubtitle}
-              </p>
             </div>
 
-            <div className="vendor-sidebar-scroll mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 pb-1.5">
+            <div className="vendor-sidebar-scroll mt-2.5 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-1">
               <nav className="space-y-1">
                 {links.map((item) => {
                   const isActive =
@@ -175,12 +291,12 @@ export function BackofficeFrame({
                   return item.disabled ? (
                     <div
                       className={cn(
-                        "flex h-11 cursor-not-allowed items-center justify-between rounded-lg px-3.5 text-sm font-semibold",
+                        "flex h-[42px] cursor-not-allowed items-center justify-between rounded-lg px-2.5 text-[13px] font-semibold",
                         isFireShop ? "vendor-nav-link vendor-nav-link-disabled" : "text-purple-200/70",
                       )}
                       key={item.href}
                     >
-                      <div className="flex min-w-0 items-center gap-2.5">
+                      <div className="flex min-w-0 items-center gap-2">
                         <span className="vendor-nav-icon inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
                           <SidebarIcon label={item.label} />
                         </span>
@@ -200,7 +316,7 @@ export function BackofficeFrame({
                   ) : (
                     <Link
                       className={cn(
-                        "flex h-11 items-center justify-between rounded-lg px-3.5 text-sm font-semibold transition-colors",
+                        "flex h-[42px] items-center justify-between rounded-lg px-2.5 text-[13px] font-semibold transition-colors",
                         isFireShop
                           ? isActive
                             ? "vendor-nav-link vendor-nav-link-active"
@@ -212,7 +328,7 @@ export function BackofficeFrame({
                       href={item.href}
                       key={item.href}
                     >
-                      <div className="flex min-w-0 items-center gap-2.5">
+                      <div className="flex min-w-0 items-center gap-2">
                         <span
                           className={cn(
                             "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
@@ -248,23 +364,23 @@ export function BackofficeFrame({
 
               <div
                 className={cn(
-                  "mt-4 rounded-lg p-3 text-xs leading-5",
+                  "mt-3 rounded-lg p-2.5 text-[11px] leading-5",
                   isFireShop
                     ? "vendor-help-card"
                     : "bg-black/20 text-purple-50",
                 )}
               >
-                <p className="vendor-title text-sm font-bold">Need help?</p>
-                <p className="mt-1">{supportText}</p>
+                <p className="vendor-title text-[13px] font-bold">Need help?</p>
+                <p className="mt-0.5">{supportText}</p>
                 {isFireShop ? (
-                  <div className="mt-3 flex items-center gap-1.5">
-                    <span className="vendor-soft-pill inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[11px] font-bold">
+                  <div className="mt-2.5 flex items-center gap-1.5">
+                    <span className="vendor-soft-pill inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold">
                       YouTube
                     </span>
-                    <span className="vendor-soft-pill inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[11px] font-bold">
+                    <span className="vendor-soft-pill inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold">
                       WhatsApp
                     </span>
-                    <span className="vendor-soft-pill inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[11px] font-bold">
+                    <span className="vendor-soft-pill inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold">
                       Meta
                     </span>
                   </div>
@@ -322,6 +438,7 @@ export function BackofficeFrame({
                     </span>
                   </button>
                 ) : null}
+                {isFireShop ? <NotificationBell variant="dark" /> : null}
                 {isFireShop ? (
                   <div className="vendor-chip inline-flex h-10 max-w-[220px] items-center overflow-hidden truncate whitespace-nowrap px-3 text-sm font-semibold">
                     {panelTitle}
@@ -472,6 +589,64 @@ function SunIcon() {
       <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
       <path
         d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+      <path
+        d="m7 10 5 5 5-5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.2"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+      <path
+        d="m5 12.5 4 4L19 6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.3"
+      />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+      <path
+        d="M12 5v14M5 12h14"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2.2"
+      />
+    </svg>
+  );
+}
+
+function WorkspaceFlameIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path
+        d="M12 3c3.4 2.5 5.2 5.3 5.2 8.5A5.2 5.2 0 0 1 12 17a5.2 5.2 0 0 1-5.2-5.5c0-2.2 1.1-4.1 3.2-5.8-.1 1.5.3 2.6 1.2 3.4.5-2.1.8-4 0.8-6.1Z"
+        fill="currentColor"
+      />
+      <path
+        d="M7 20h10"
         stroke="currentColor"
         strokeLinecap="round"
         strokeWidth="2"

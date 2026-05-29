@@ -274,28 +274,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           promoCards={homepagePromos.promoCards}
         />
 
-        <section
-          className="space-y-3 rounded-2xl bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/5 sm:p-4"
-          id="offres"
-        >
-          <SectionHeader
-            href="/search"
-            subtitle="Des produits publies avec prix clairs et paiement a la livraison."
-            title="Meilleures offres"
-          />
-          <div className="grid grid-cols-2 items-stretch gap-2 md:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-8">
-            {bestOffers.length > 0 ? (
-              bestOffers.map((product) => (
-                <CompactProductCard key={product.id} product={product} />
-              ))
-            ) : (
-              <div className="col-span-full">
-                <EmptyProducts label="Aucune meilleure offre disponible." />
-              </div>
-            )}
-          </div>
-        </section>
-
         <section className="grid gap-3 lg:grid-cols-2" id="produits">
           <article className="space-y-3 rounded-2xl bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/5 sm:p-4">
             <SectionHeader
@@ -334,6 +312,34 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               )}
             </div>
           </article>
+        </section>
+
+        <div className="flex items-center justify-center gap-3 text-sm text-slate-500 sm:text-base">
+          <span className="h-px w-14 bg-slate-300" />
+          <span>Recommand&eacute; pour vous</span>
+          <span className="h-px w-14 bg-slate-300" />
+        </div>
+
+        <section
+          className="space-y-3 rounded-2xl bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/5 sm:p-4"
+          id="offres"
+        >
+          <SectionHeader
+            href="/search"
+            subtitle="Des produits publies avec prix clairs et paiement a la livraison."
+            title="Meilleures offres"
+          />
+          <div className="grid grid-cols-2 items-stretch gap-2 md:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-8">
+            {bestOffers.length > 0 ? (
+              bestOffers.map((product) => (
+                <CompactProductCard key={product.id} product={product} />
+              ))
+            ) : (
+              <div className="col-span-full">
+                <EmptyProducts label="Aucune meilleure offre disponible." />
+              </div>
+            )}
+          </div>
         </section>
       </Container>
     </main>

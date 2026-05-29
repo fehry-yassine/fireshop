@@ -52,6 +52,18 @@ enum HomepagePromoType {
   HERO_SLIDE
 }
 
+enum NotificationType {
+  ORDER_PLACED
+  ORDER_STATUS_CHANGED
+  ORDER_CANCELLED
+  PRODUCT_APPROVED
+  PRODUCT_REJECTED
+  VENDOR_APPLICATION_APPROVED
+  VENDOR_APPLICATION_REJECTED
+  NEW_ORDER_RECEIVED
+  NEW_VENDOR_APPLICATION
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -60,11 +72,12 @@ model User {
   phone        String?
   role         Role       @default(BUYER)
   isActive     Boolean    @default(true)
-  vendor       Vendor?
-  cartItems    CartItem[]
-  orders       Order[]    @relation("BuyerOrders")
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  vendor        Vendor?
+  cartItems     CartItem[]
+  orders        Order[]         @relation("BuyerOrders")
+  notifications Notification[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 }
 
 model Vendor {
@@ -232,4 +245,19 @@ model AuditLog {
   @@index([actorUserId, createdAt])
   @@index([action, createdAt])
   @@index([entityType, entityId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  metadata  Json?
+  isRead    Boolean          @default(false)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
 }

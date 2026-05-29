@@ -23,12 +23,13 @@ export function AdminDashboardFrame({ children }: AdminDashboardFrameProps) {
       links={adminLinks}
       logoAlt="FireShop admin workspace"
       logoSrc="/brand/fireshop-admin-logo.png"
-      panelLabel="Admin Panel"
-      panelSubtitle="Marketplace Operations"
+      panelLabel="Admin workspace"
+      panelSubtitle="Marketplace control center"
       panelTitle="FireShop"
       supportText="Moderate vendors, monitor orders, and keep catalog data clean."
       topBadgeLabel="Admin Workspace"
       topTitle="Admin Dashboard"
+      workspacePanelTitle="Workspaces"
     >
       {children}
     </BackofficeFrame>

@@ -1,6 +1,6 @@
 # LocalMarket PFE Marketplace
 
-LocalMarket is the temporary project name for a Tunisia-focused cash-on-delivery multi-vendor marketplace. The final name candidate is FireShop, but the name is not locked yet.
+LocalMarket is the temporary project name for a Tunisia-focused cash-on-delivery multi-vendor marketplace. The final name candidate is FireShop.
 
 ## Project Goal
 

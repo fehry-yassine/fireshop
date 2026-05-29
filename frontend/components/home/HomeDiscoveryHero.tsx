@@ -339,11 +339,6 @@ export function HomeDiscoveryHero({
         </section>
       </div>
 
-      <div className="flex items-center justify-center gap-3 text-sm text-slate-500 sm:text-base">
-        <span className="h-px w-14 bg-slate-300" />
-        <span>Recommand&eacute; pour vous</span>
-        <span className="h-px w-14 bg-slate-300" />
-      </div>
     </section>
   );
 }

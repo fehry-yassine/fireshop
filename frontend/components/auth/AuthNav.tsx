@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -148,6 +149,8 @@ export function AuthNav() {
               <CartIcon />
             </Link>
           ) : null}
+
+          <NotificationBell variant="light" />
 
           <div className="relative shrink-0" ref={menuRef}>
             <button

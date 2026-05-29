@@ -24,13 +24,15 @@ export function VendorDashboardFrame({ children, user, vendor }: VendorDashboard
       links={vendorLinks}
       logoAlt="FireShop seller workspace"
       logoSrc="/brand/fireshop-seller-logo.png"
-      panelLabel="Seller Panel"
+      panelLabel="Seller workspace"
       panelSubtitle={vendor.slug}
       panelTitle={vendor.storeName}
       supportText="Manage products, stock, and received COD orders from one focused seller workspace."
       topBadgeLabel="Vendor Workspace"
       topTitle="Vendor Dashboard"
       user={user}
+      workspaceDisabledActionLabel="New store"
+      workspacePanelTitle="Stores"
     >
       {children}
     </BackofficeFrame>

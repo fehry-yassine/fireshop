@@ -51,6 +51,7 @@ function AdminCategoriesContent() {
   const [message, setMessage] = useState<CategoryMessage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
   const [isPanelSaving, setIsPanelSaving] = useState(false);
   const [panelState, setPanelState] = useState<CategoryPanelState>(null);
   const [panelDraft, setPanelDraft] = useState<CategoryDraft>(emptyCategoryDraft());
@@ -106,6 +107,12 @@ function AdminCategoriesContent() {
     setSearch("");
     setStatusFilter("ALL");
     setTypeFilter("ALL");
+  }
+
+  function toggleExpandedCategory(categoryId: string) {
+    setExpandedCategoryId((currentId) =>
+      currentId === categoryId ? null : categoryId,
+    );
   }
 
   async function saveCategory(event: FormEvent<HTMLFormElement>) {
@@ -228,6 +235,9 @@ function AdminCategoriesContent() {
         text: "Category permanently deleted.",
         tone: "success",
       });
+      if (expandedCategoryId === category.id) {
+        setExpandedCategoryId(null);
+      }
       await loadCategories();
     } catch (error) {
       setMessage({
@@ -266,42 +276,41 @@ function AdminCategoriesContent() {
     };
   }, [categories, rootCategories.length]);
 
-  const visibleTree = useMemo(() => {
-    return rootCategories
-      .map((category) => {
-        const visibleChildren =
-          typeFilter === "MAIN"
-            ? []
-            : (subcategoriesByParent[category.id] ?? []).filter((child) =>
-                categoryMatchesFilters(child, search, statusFilter),
-              );
-        const parentMatches =
-          typeFilter !== "SUB" && categoryMatchesFilters(category, search, statusFilter);
+  const visibleMainCategories = useMemo(() => {
+    return rootCategories.filter((category) => {
+      const totalSubcategories = (subcategoriesByParent[category.id] ?? []).length;
+      const matchesType =
+        typeFilter === "ALL" ||
+        (typeFilter === "MAIN" && totalSubcategories === 0) ||
+        (typeFilter === "SUB" && totalSubcategories > 0);
 
-        return {
-          category,
-          children: visibleChildren,
-          isVisible: parentMatches || visibleChildren.length > 0,
-          parentMatches,
-        };
-      })
-      .filter((item) => item.isVisible);
+      return (
+        matchesType &&
+        categoryMatchesFilters(category, search, statusFilter)
+      );
+    });
   }, [rootCategories, search, statusFilter, subcategoriesByParent, typeFilter]);
+
+  useEffect(() => {
+    if (
+      expandedCategoryId &&
+      !visibleMainCategories.some((category) => category.id === expandedCategoryId)
+    ) {
+      setExpandedCategoryId(null);
+    }
+  }, [expandedCategoryId, visibleMainCategories]);
 
   const rootOptions =
     panelState?.mode === "edit"
       ? rootCategories.filter((category) => category.id !== panelState.category.id)
       : rootCategories;
-  const shownCount = visibleTree.reduce(
-    (total, item) => total + (item.parentMatches ? 1 : 0) + item.children.length,
-    0,
-  );
+  const shownCount = visibleMainCategories.length;
   const hasActiveFilters =
     search.trim().length > 0 || statusFilter !== "ALL" || typeFilter !== "ALL";
   const panelMessage = getPanelMessage(panelState, message);
 
   return (
-    <div className="space-y-6">
+    <div className="admin-page-shell">
       <PremiumPageHeader
         actionLabel="Create category"
         eyebrow="Catalog structure"
@@ -314,7 +323,7 @@ function AdminCategoriesContent() {
         <InlineMessage message={message} />
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="admin-kpi-grid">
         <MetricCard
           icon={<GridIcon />}
           label="Total categories"
@@ -338,28 +347,27 @@ function AdminCategoriesContent() {
           icon={<CheckIcon />}
           label="Active categories"
           meta="Visible to shoppers"
-          tone="success"
           value={stats.activeCategories}
         />
       </div>
 
-      <Card className="overflow-hidden border-slate-200/90 shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
-        <CardContent className="space-y-5 p-4 sm:p-5">
+      <Card className="admin-surface-card">
+        <CardContent className="space-y-4 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="text-lg font-bold text-slate-950">
                 Category manager
               </h3>
               <p className="text-sm text-slate-500">
-                Search, filter, and manage parent categories with their nested subcategories.
+                Search and manage main categories. Click a main category to reveal its subcategories.
               </p>
             </div>
             <span className="inline-flex w-fit items-center rounded-full border border-market-200 bg-market-50 px-3 py-1.5 text-xs font-bold text-market-900">
-              {shownCount} shown
+              {shownCount} main shown
             </span>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 shadow-inner shadow-white">
+          <div className="admin-filter-bar">
             <div className="grid gap-3 lg:grid-cols-[minmax(240px,0.9fr)_180px_220px_auto] lg:items-center">
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -367,7 +375,7 @@ function AdminCategoriesContent() {
                 </span>
                 <Input
                   aria-label="Search categories"
-                  className="h-11 border-slate-200 bg-white pl-10 shadow-sm shadow-slate-200/50"
+                  className="h-10 border-slate-200 bg-white pl-10 shadow-sm shadow-slate-200/50"
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search name or slug"
                   type="search"
@@ -388,12 +396,12 @@ function AdminCategoriesContent() {
                 onChange={(value) => setTypeFilter(value as TypeFilter)}
                 value={typeFilter}
               >
-                <option value="ALL">All types</option>
-                <option value="MAIN">Main categories</option>
-                <option value="SUB">Subcategories</option>
+                <option value="ALL">All main categories</option>
+                <option value="MAIN">No subcategories</option>
+                <option value="SUB">With subcategories</option>
               </SelectControl>
               <Button
-                className="h-11 border-slate-200 px-3"
+                className="h-10 border-slate-200 px-3"
                 disabled={!hasActiveFilters}
                 onClick={clearFilters}
                 variant="secondary"
@@ -413,33 +421,41 @@ function AdminCategoriesContent() {
               text="Build the first public catalog aisle for the marketplace."
               title="No categories yet"
             />
-          ) : visibleTree.length === 0 ? (
+          ) : visibleMainCategories.length === 0 ? (
             <EmptyPanel
               actionLabel="Clear filters"
               icon={<SearchIcon />}
               onAction={clearFilters}
-              text="Try a broader search or reset filters to review all catalog sections."
-              title="No categories match"
+              text="Try a broader main-category search or reset filters to review all catalog sections."
+              title="No main categories match"
             />
           ) : (
             <div className="space-y-3">
-              {visibleTree.map(({ category, children, parentMatches }) => (
-                <CategoryGroup
-                  activeCategoryId={activeCategoryId}
-                  category={category}
-                  childrenToShow={children}
-                  key={category.id}
-                  message={message}
-                  onDelete={deleteCategoryPermanently}
-                  onCreateSubcategory={() => openCreatePanel(category.id)}
-                  onEdit={openEditPanel}
-                  onToggleStatus={toggleCategoryStatus}
-                  parentMatches={parentMatches}
-                  totalSubcategories={
-                    (subcategoriesByParent[category.id] ?? []).length
-                  }
-                />
-              ))}
+              {visibleMainCategories.map((category) => {
+                const subcategories = subcategoriesByParent[category.id] ?? [];
+                const visibleSubcategories = subcategories.filter((child) =>
+                  categoryMatchesStatus(child, statusFilter),
+                );
+                const isExpanded = expandedCategoryId === category.id;
+
+                return (
+                  <CategoryGroup
+                    activeCategoryId={activeCategoryId}
+                    category={category}
+                    childrenToShow={isExpanded ? visibleSubcategories : []}
+                    isExpanded={isExpanded}
+                    key={category.id}
+                    message={message}
+                    onDelete={deleteCategoryPermanently}
+                    onCreateSubcategory={() => openCreatePanel(category.id)}
+                    onEdit={openEditPanel}
+                    onToggleExpanded={() => toggleExpandedCategory(category.id)}
+                    onToggleStatus={toggleCategoryStatus}
+                    totalSubcategories={subcategories.length}
+                    visibleSubcategoryCount={visibleSubcategories.length}
+                  />
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -498,69 +514,90 @@ function CategoryGroup({
   activeCategoryId,
   category,
   childrenToShow,
+  isExpanded,
   message,
   onCreateSubcategory,
   onDelete,
   onEdit,
+  onToggleExpanded,
   onToggleStatus,
-  parentMatches,
   totalSubcategories,
+  visibleSubcategoryCount,
 }: {
   activeCategoryId: string | null;
   category: Category;
   childrenToShow: Category[];
+  isExpanded: boolean;
   message: CategoryMessage | null;
   onCreateSubcategory: () => void;
   onDelete: (category: Category) => void;
   onEdit: (category: Category) => void;
+  onToggleExpanded: () => void;
   onToggleStatus: (category: Category) => void;
-  parentMatches: boolean;
   totalSubcategories: number;
+  visibleSubcategoryCount: number;
 }) {
   return (
-    <div className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.055)] transition duration-200 hover:-translate-y-0.5 hover:border-market-200 hover:shadow-[0_20px_45px_rgba(255,106,45,0.10)]">
-      {parentMatches ? (
-        <CategoryRow
-          activeCategoryId={activeCategoryId}
-          category={category}
-          message={message?.categoryId === category.id ? message : null}
-          onCreateSubcategory={onCreateSubcategory}
-          onDelete={() => onDelete(category)}
-          onEdit={() => onEdit(category)}
-          onToggleStatus={() => onToggleStatus(category)}
-          subcategoryCount={totalSubcategories}
-          variant="parent"
-        />
-      ) : (
-        <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="font-bold text-slate-950">{category.name}</p>
-              <p className="break-all text-xs font-semibold text-slate-500">
-                {category.slug}
+    <div
+      className={cn(
+        "group overflow-hidden rounded-xl border bg-white shadow-[0_8px_22px_rgba(15,23,42,0.045)] transition duration-200",
+        isExpanded
+          ? "border-market-200 shadow-[0_16px_38px_rgba(255,106,45,0.09)]"
+          : "border-slate-200 hover:border-market-200 hover:shadow-[0_14px_32px_rgba(255,106,45,0.08)]",
+      )}
+    >
+      <CategoryRow
+        activeCategoryId={activeCategoryId}
+        category={category}
+        isExpanded={isExpanded}
+        message={message?.categoryId === category.id ? message : null}
+        onCreateSubcategory={onCreateSubcategory}
+        onDelete={() => onDelete(category)}
+        onEdit={() => onEdit(category)}
+        onToggleExpand={onToggleExpanded}
+        onToggleStatus={() => onToggleStatus(category)}
+        subcategoryCount={totalSubcategories}
+        variant="parent"
+      />
+
+      {isExpanded ? (
+        <div className="border-t border-slate-100 bg-slate-50/70 p-3">
+          <div className="mb-2.5 pl-3">
+            <div className="border-l-2 border-market-300 pl-3">
+              <p className="text-xs font-black uppercase tracking-wide text-market-800">
+                Subcategories
+              </p>
+              <p className="mt-1 text-sm font-medium text-slate-500">
+                {visibleSubcategoryCount > 0
+                  ? `${visibleSubcategoryCount} shown for ${category.name}`
+                  : totalSubcategories > 0
+                    ? `No subcategories match the current filters for ${category.name}`
+                    : `Create the first subcategory for ${category.name}`}
               </p>
             </div>
-            <Badge className="border-market-200 bg-market-50 text-market-900" tone="neutral">
-              {totalSubcategories} subcategories
-            </Badge>
           </div>
-        </div>
-      )}
-
-      {childrenToShow.length > 0 ? (
-        <div className="space-y-2 border-t border-slate-100 bg-gradient-to-b from-slate-50/90 to-white p-3">
-          {childrenToShow.map((child) => (
-            <CategoryRow
-              activeCategoryId={activeCategoryId}
-              category={child}
-              key={child.id}
-              message={message?.categoryId === child.id ? message : null}
-              onDelete={() => onDelete(child)}
-              onEdit={() => onEdit(child)}
-              onToggleStatus={() => onToggleStatus(child)}
-              variant="child"
-            />
-          ))}
+          {childrenToShow.length > 0 ? (
+            <div className="space-y-2 pl-3">
+              {childrenToShow.map((child) => (
+                <CategoryRow
+                  activeCategoryId={activeCategoryId}
+                  category={child}
+                  key={child.id}
+                  message={message?.categoryId === child.id ? message : null}
+                  onDelete={() => onDelete(child)}
+                  onEdit={() => onEdit(child)}
+                  onToggleStatus={() => onToggleStatus(child)}
+                  variant="child"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="ml-3 rounded-lg border border-dashed border-slate-200 bg-white px-4 py-5 text-sm font-semibold text-slate-500">
+              {totalSubcategories > 0
+                ? "No subcategories match the current filters."
+                : "No subcategories yet. Create the first subcategory for this category."}
+            </div>
+          )}
         </div>
       ) : null}
     </div>
@@ -570,20 +607,24 @@ function CategoryGroup({
 function CategoryRow({
   activeCategoryId,
   category,
+  isExpanded = false,
   message,
   onCreateSubcategory,
   onDelete,
   onEdit,
+  onToggleExpand,
   onToggleStatus,
   subcategoryCount = 0,
   variant,
 }: {
   activeCategoryId: string | null;
   category: Category;
+  isExpanded?: boolean;
   message: CategoryMessage | null;
   onCreateSubcategory?: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onToggleExpand?: () => void;
   onToggleStatus: () => void;
   subcategoryCount?: number;
   variant: "child" | "parent";
@@ -596,20 +637,35 @@ function CategoryRow({
 
   return (
     <div
+      aria-expanded={variant === "parent" ? isExpanded : undefined}
       className={cn(
         "grid gap-3 bg-white lg:grid-cols-[minmax(0,1fr)_auto]",
         variant === "parent"
-          ? "p-4 sm:p-5"
-          : "relative rounded-lg border border-slate-200/80 p-3 pl-4 shadow-sm shadow-slate-200/40 before:absolute before:bottom-3 before:left-0 before:top-3 before:w-1 before:rounded-r-full before:bg-market-300",
+          ? "cursor-pointer p-3.5 transition hover:bg-slate-50/70 focus:outline-none focus:ring-2 focus:ring-market-600/15 sm:p-4"
+          : "relative rounded-lg border border-slate-200/80 p-2.5 pl-4 shadow-sm shadow-slate-200/40 before:absolute before:bottom-3 before:left-0 before:top-3 before:w-1 before:rounded-r-full before:bg-market-300",
+        variant === "parent" && isExpanded ? "bg-orange-50/30" : null,
       )}
+      onClick={variant === "parent" ? onToggleExpand : undefined}
+      onKeyDown={
+        variant === "parent"
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onToggleExpand?.();
+              }
+            }
+          : undefined
+      }
+      role={variant === "parent" ? "button" : undefined}
+      tabIndex={variant === "parent" ? 0 : undefined}
     >
-      <div className="min-w-0 space-y-3">
+      <div className="min-w-0 space-y-2.5">
         <div className="flex min-w-0 gap-3">
           <div
             className={cn(
               "hidden shrink-0 items-center justify-center rounded-lg border font-black shadow-sm sm:flex",
               variant === "parent"
-                ? "h-11 w-11 border-market-200 bg-market-50 text-market-800"
+                ? "h-10 w-10 border-market-200 bg-market-50 text-market-800"
                 : "h-9 w-9 border-slate-200 bg-slate-50 text-slate-500",
             )}
           >
@@ -620,16 +676,23 @@ function CategoryRow({
               <h3
                 className={cn(
                   "break-words font-bold leading-tight text-slate-950",
-                  variant === "child" ? "text-sm" : "text-lg",
+                  variant === "child" ? "text-sm" : "text-base",
                 )}
               >
                 {category.name}
               </h3>
               <StatusBadge isActive={active} />
               {variant === "parent" ? (
-                <Badge className="border-market-200 bg-market-50 text-market-900" tone="neutral">
-                  Main category
-                </Badge>
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold",
+                    isExpanded
+                      ? "border-market-200 bg-market-50 text-market-900"
+                      : "border-slate-200 bg-slate-50 text-slate-600",
+                  )}
+                >
+                  {isExpanded ? "Showing subcategories" : "Click to reveal"}
+                </span>
               ) : (
                 <Badge tone="neutral">Subcategory</Badge>
               )}
@@ -659,21 +722,25 @@ function CategoryRow({
         {message ? <InlineMessage message={message} /> : null}
       </div>
 
-      <div className="flex flex-wrap items-start gap-2 lg:justify-end">
+      <div
+        className="flex flex-wrap items-start gap-2 lg:justify-end"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
         {onCreateSubcategory ? (
           <Button
-            className="h-9 bg-gradient-to-r from-market-700 to-orange-500 px-3 shadow-md shadow-market-600/20 hover:from-market-800 hover:to-orange-600"
+            className="h-8 bg-gradient-to-r from-market-700 to-orange-500 px-2.5 text-xs shadow-md shadow-market-600/20 hover:from-market-800 hover:to-orange-600"
             onClick={onCreateSubcategory}
           >
             Create subcategory
           </Button>
         ) : null}
-        <Button className="h-9 border-slate-200 px-3" onClick={onEdit} variant="secondary">
+        <Button className="h-8 border-slate-200 px-2.5 text-xs" onClick={onEdit} variant="secondary">
           Edit
         </Button>
         <Button
           className={cn(
-            "h-9 px-3",
+            "h-8 px-2.5 text-xs",
             active
               ? "text-red-700 hover:bg-red-50 hover:text-red-800"
               : "bg-gradient-to-r from-market-700 to-orange-500 shadow-md shadow-market-600/20",
@@ -686,7 +753,7 @@ function CategoryRow({
         </Button>
         {canDelete ? (
           <Button
-            className="h-9 border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100 hover:text-red-800"
+            className="h-8 border-red-200 bg-red-50 px-2.5 text-xs text-red-700 hover:bg-red-100 hover:text-red-800"
             disabled={isWorking}
             onClick={onDelete}
             title="Delete permanently"
@@ -847,29 +914,24 @@ function PremiumPageHeader({
   title: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-market-100 bg-gradient-to-br from-white via-white to-market-50 p-5 shadow-[0_22px_60px_rgba(15,23,42,0.08)] sm:p-6">
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-market-700 via-orange-500 to-amber-300" />
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="admin-page-header">
         <div className="space-y-2">
-          <span className="inline-flex rounded-full border border-market-200 bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-market-800 shadow-sm shadow-market-100/60">
-            {eyebrow}
-          </span>
+          <p className="admin-page-eyebrow">{eyebrow}</p>
           <div>
-            <h2 className="text-3xl font-black leading-tight text-slate-950 sm:text-4xl">
+            <h2 className="admin-page-title">
               {title}
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            <p className="admin-page-description">
               {subtitle}
             </p>
           </div>
         </div>
         <Button
-          className="h-11 bg-gradient-to-r from-market-700 to-orange-500 px-5 shadow-lg shadow-market-600/20 hover:from-market-800 hover:to-orange-600"
+          className="h-10 bg-gradient-to-r from-market-700 to-orange-500 px-4 shadow-lg shadow-market-600/20 hover:from-market-800 hover:to-orange-600"
           onClick={onAction}
         >
           {actionLabel}
         </Button>
-      </div>
     </div>
   );
 }
@@ -894,18 +956,16 @@ function MetricCard({
   }[tone];
 
   return (
-    <Card className="overflow-hidden border-slate-200/90 bg-gradient-to-br from-white to-slate-50/80 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
-      <CardContent className="space-y-4 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-600">{label}</p>
-            <p className="mt-1 text-xs font-semibold text-slate-400">{meta}</p>
-          </div>
-          <span className={cn("inline-flex h-10 w-10 items-center justify-center rounded-lg border", toneClass)}>
-            {icon}
-          </span>
+    <Card className="admin-kpi-card">
+      <CardContent className="admin-kpi-card-content">
+        <div>
+          <p className="admin-kpi-label">{label}</p>
+          <p className="admin-kpi-hint">{meta}</p>
+          <p className="admin-kpi-value">{value}</p>
         </div>
-        <p className="text-3xl font-black leading-none text-slate-950">{value}</p>
+        <span className={cn("inline-flex h-10 w-10 items-center justify-center rounded-lg border", toneClass)}>
+          {icon}
+        </span>
       </CardContent>
     </Card>
   );
@@ -940,7 +1000,7 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
     <Badge
       className={
         isActive
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          ? "border-slate-200 bg-white text-slate-700"
           : "border-slate-200 bg-slate-100 text-slate-600"
       }
       tone="neutral"
@@ -988,7 +1048,7 @@ function SelectControl({
   return (
     <select
       aria-label={ariaLabel}
-      className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm shadow-slate-200/50 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
+      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm shadow-slate-200/50 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
       onChange={(event) => onChange(event.target.value)}
       value={value}
     >
@@ -1142,6 +1202,16 @@ function categoryMatchesFilters(
     (statusFilter === "DISABLED" && !active);
 
   return matchesSearch && matchesStatus;
+}
+
+function categoryMatchesStatus(category: Category, statusFilter: StatusFilter) {
+  const active = isCategoryActive(category);
+
+  return (
+    statusFilter === "ALL" ||
+    (statusFilter === "ACTIVE" && active) ||
+    (statusFilter === "DISABLED" && !active)
+  );
 }
 
 function getPanelMessage(

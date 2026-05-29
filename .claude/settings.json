@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\yassi\\.claude\\projects\\c--fireshop-V2\\memory"
+    ]
+  }
+}

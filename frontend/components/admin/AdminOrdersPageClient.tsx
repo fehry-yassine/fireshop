@@ -43,6 +43,97 @@ const ORDER_STATUS_FILTERS: OrderStatusFilter[] = [
   "CANCELLED",
   "RETURNED",
 ];
+const ORDER_TABLE_SCROLL_STYLE = {
+  maxHeight: "clamp(520px, calc(100vh - 360px), 720px)",
+};
+const ORDER_TABLE_HEADER_CELL_CLASS =
+  "sticky top-0 z-20 whitespace-nowrap border-b border-slate-200 bg-slate-50 py-2.5";
+const ORDER_TABLE_BODY_CELL_CLASS = "py-2.5";
+const ORDER_TABLE_COLUMNS = [
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto block w-full text-center",
+    headerClass: "text-center",
+    key: "id",
+    label: "ID",
+    width: "5.5%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto flex w-full justify-center",
+    headerClass: "text-center",
+    key: "status",
+    label: "Status",
+    width: "11.5%",
+  },
+  {
+    cellClass: "min-w-0 text-center",
+    contentClass: "mx-auto block w-full max-w-[136px] min-w-0 text-center",
+    headerClass: "text-center",
+    key: "vendor",
+    label: "Vendor",
+    width: "13%",
+  },
+  {
+    cellClass: "min-w-0 text-center",
+    contentClass: "mx-auto block w-full max-w-[136px] min-w-0 text-center",
+    headerClass: "text-center",
+    key: "buyer",
+    label: "Buyer",
+    width: "13%",
+  },
+  {
+    cellClass: "min-w-0 text-center",
+    contentClass: "mx-auto block w-full max-w-[120px] min-w-0 text-center",
+    headerClass: "text-center",
+    key: "phone",
+    label: "Phone",
+    width: "11%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto block w-full text-center",
+    headerClass: "text-center",
+    key: "items",
+    label: "Items",
+    width: "6%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto block w-full text-center",
+    headerClass: "text-center",
+    key: "total",
+    label: "Total",
+    width: "8.5%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto block w-full text-center",
+    headerClass: "text-center",
+    key: "created",
+    label: "Created",
+    width: "13.5%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto flex w-full justify-center",
+    headerClass: "text-center",
+    key: "actions",
+    label: "Actions",
+    width: "18%",
+  },
+] as const;
+const ORDER_TABLE_COLUMN = {
+  actions: ORDER_TABLE_COLUMNS[8],
+  buyer: ORDER_TABLE_COLUMNS[3],
+  created: ORDER_TABLE_COLUMNS[7],
+  id: ORDER_TABLE_COLUMNS[0],
+  items: ORDER_TABLE_COLUMNS[5],
+  phone: ORDER_TABLE_COLUMNS[4],
+  status: ORDER_TABLE_COLUMNS[1],
+  total: ORDER_TABLE_COLUMNS[6],
+  vendor: ORDER_TABLE_COLUMNS[2],
+} as const;
 
 export function AdminOrdersPageClient() {
   return (
@@ -96,6 +187,16 @@ function AdminOrdersContent() {
   const openOrders = useMemo(
     () => orders.filter((order) => !isFinalOrderStatus(order.status)),
     [orders],
+  );
+
+  const orderStats = useMemo(
+    () => ({
+      cancelled: orders.filter((order) => order.status === "CANCELLED").length,
+      delivered: orders.filter((order) => order.status === "DELIVERED").length,
+      open: openOrders.length,
+      returned: orders.filter((order) => order.status === "RETURNED").length,
+    }),
+    [openOrders.length, orders],
   );
 
   const vendorOptions = useMemo(() => {
@@ -228,18 +329,18 @@ function AdminOrdersContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <div className="admin-page-shell">
+      <div className="admin-page-header">
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-market-700">Order supervision</p>
-          <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl">
+          <p className="admin-page-eyebrow">Order supervision</p>
+          <h2 className="admin-page-title">
             Marketplace orders
           </h2>
-          <p className="max-w-2xl text-sm leading-6 text-slate-600">
+          <p className="admin-page-description">
             Monitor COD orders across vendors and update status when needed.
           </p>
         </div>
-        <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+        <div className="admin-header-badge">
           {openOrders.length} open
         </div>
       </div>
@@ -248,9 +349,11 @@ function AdminOrdersContent() {
         <InlineMessage message={message} />
       ) : null}
 
-      <Card>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(240px,1fr)_180px_220px_auto_auto] lg:items-center">
+      <OrderKpiCards stats={orderStats} />
+
+      <Card className="admin-surface-card">
+        <CardContent className="space-y-2.5 p-3.5 sm:p-4">
+          <div className="admin-filter-bar grid gap-3 lg:grid-cols-[minmax(240px,1fr)_180px_220px_auto_auto] lg:items-center">
             <Input
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search order, buyer, phone, vendor"
@@ -310,19 +413,28 @@ function AdminOrdersContent() {
             />
           ) : (
             <>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="min-w-[980px] w-full table-fixed border-collapse text-sm">
+              <div
+                className="admin-table-shell hidden overflow-auto bg-white md:block"
+                style={ORDER_TABLE_SCROLL_STYLE}
+              >
+                <table className="admin-table min-w-[1180px] table-fixed xl:min-w-full">
+                  <colgroup>
+                    {ORDER_TABLE_COLUMNS.map((column) => (
+                      <col key={column.key} style={{ width: column.width }} />
+                    ))}
+                  </colgroup>
                   <thead>
-                    <tr className="border-b text-left text-xs font-bold uppercase tracking-normal text-slate-600">
-                      <th className="w-14 px-3 py-2.5">ID</th>
-                      <th className="w-32 px-3 py-2.5">Status</th>
-                      <th className="px-3 py-2.5">Vendor</th>
-                      <th className="px-3 py-2.5">Buyer</th>
-                      <th className="w-36 px-3 py-2.5">Phone</th>
-                      <th className="w-20 px-3 py-2.5 text-right">Items</th>
-                      <th className="w-28 px-3 py-2.5 text-right">Total</th>
-                      <th className="w-44 px-3 py-2.5">Created</th>
-                      <th className="w-56 whitespace-nowrap px-3 py-2.5 text-right">Actions</th>
+                    <tr>
+                      {ORDER_TABLE_COLUMNS.map((column) => (
+                        <th
+                          className={`${ORDER_TABLE_HEADER_CELL_CLASS} ${column.headerClass}`}
+                          key={column.key}
+                        >
+                          <span className={column.contentClass}>
+                            {column.label}
+                          </span>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -413,42 +525,108 @@ function AdminOrderTableRow({
   order: Order;
 }) {
   return (
-    <tr className="border-b align-middle transition hover:bg-slate-50">
-      <td className="whitespace-nowrap px-3 py-2.5 font-bold text-slate-950">
-        {displayIndex}
+    <tr className="align-middle transition hover:bg-slate-50/80">
+      <td className={`whitespace-nowrap font-bold text-slate-950 ${ORDER_TABLE_BODY_CELL_CLASS} ${ORDER_TABLE_COLUMN.id.cellClass}`}>
+        <span className={ORDER_TABLE_COLUMN.id.contentClass}>
+          {displayIndex}
+        </span>
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5">
-        <AdminOrderStatusBadge status={order.status} />
+      <td className={`whitespace-nowrap ${ORDER_TABLE_BODY_CELL_CLASS} ${ORDER_TABLE_COLUMN.status.cellClass}`}>
+        <div className={ORDER_TABLE_COLUMN.status.contentClass}>
+          <AdminOrderStatusBadge status={order.status} />
+        </div>
       </td>
-      <td className="px-3 py-2.5">
-        <p className="truncate font-semibold text-slate-800">
+      <td className={`${ORDER_TABLE_BODY_CELL_CLASS} ${ORDER_TABLE_COLUMN.vendor.cellClass}`}>
+        <p className={`truncate font-semibold text-slate-800 ${ORDER_TABLE_COLUMN.vendor.contentClass}`}>
           {order.vendor.storeName}
         </p>
       </td>
-      <td className="px-3 py-2.5">
-        <p className="truncate font-semibold text-slate-950">
+      <td className={`${ORDER_TABLE_BODY_CELL_CLASS} ${ORDER_TABLE_COLUMN.buyer.cellClass}`}>
+        <p className={`truncate font-semibold text-slate-950 ${ORDER_TABLE_COLUMN.buyer.contentClass}`}>
           {order.shipping.fullName}
         </p>
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">{order.shipping.phone}</td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold text-slate-950">
-        {getOrderItemCount(order)}
+      <td className={`whitespace-nowrap text-slate-700 ${ORDER_TABLE_BODY_CELL_CLASS} ${ORDER_TABLE_COLUMN.phone.cellClass}`}>
+        <span className={`truncate ${ORDER_TABLE_COLUMN.phone.contentClass}`}>
+          {order.shipping.phone}
+        </span>
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold text-slate-950">
-        {formatTnd(order.total)}
+      <td className={`whitespace-nowrap font-semibold tabular-nums text-slate-950 ${ORDER_TABLE_BODY_CELL_CLASS} ${ORDER_TABLE_COLUMN.items.cellClass}`}>
+        <span className={ORDER_TABLE_COLUMN.items.contentClass}>
+          {getOrderItemCount(order)}
+        </span>
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">
-        {formatCompactDateTime(order.createdAt)}
+      <td className={`whitespace-nowrap font-bold tabular-nums text-slate-950 ${ORDER_TABLE_BODY_CELL_CLASS} ${ORDER_TABLE_COLUMN.total.cellClass}`}>
+        <span className={ORDER_TABLE_COLUMN.total.contentClass}>
+          {formatTnd(order.total)}
+        </span>
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-right">
-        <OrderRowActions
-          activeOrderId={activeOrderId}
-          onCancel={onCancel}
-          onOpen={onOpen}
-          order={order}
-        />
+      <td className={`whitespace-nowrap text-slate-700 ${ORDER_TABLE_BODY_CELL_CLASS} ${ORDER_TABLE_COLUMN.created.cellClass}`}>
+        <span className={ORDER_TABLE_COLUMN.created.contentClass}>
+          {formatCompactDateTime(order.createdAt)}
+        </span>
+      </td>
+      <td className={`whitespace-nowrap ${ORDER_TABLE_BODY_CELL_CLASS} ${ORDER_TABLE_COLUMN.actions.cellClass}`}>
+        <div className={ORDER_TABLE_COLUMN.actions.contentClass}>
+          <OrderRowActions
+            activeOrderId={activeOrderId}
+            onCancel={onCancel}
+            onOpen={onOpen}
+            order={order}
+          />
+        </div>
       </td>
     </tr>
+  );
+}
+
+function OrderKpiCards({
+  stats,
+}: {
+  stats: {
+    cancelled: number;
+    delivered: number;
+    open: number;
+    returned: number;
+  };
+}) {
+  const cards = [
+    {
+      label: "Open orders",
+      toneClass: "border-amber-200 bg-amber-50 text-amber-700",
+      value: stats.open,
+    },
+    {
+      label: "Delivered",
+      toneClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      value: stats.delivered,
+    },
+    {
+      label: "Cancelled",
+      toneClass: "border-slate-300 bg-slate-100 text-slate-700",
+      value: stats.cancelled,
+    },
+    {
+      label: "Returned",
+      toneClass: "border-orange-200 bg-orange-50 text-orange-800",
+      value: stats.returned,
+    },
+  ];
+
+  return (
+    <div className="admin-kpi-grid">
+      {cards.map((card) => (
+        <Card className="admin-kpi-card" key={card.label}>
+          <CardContent className="admin-kpi-card-content">
+            <div>
+              <p className="admin-kpi-label">{card.label}</p>
+              <p className="admin-kpi-value">{card.value}</p>
+            </div>
+            <span className={`admin-kpi-dot ${card.toneClass}`} />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }
 
@@ -509,14 +687,14 @@ function OrderRowActions({
   const canCancel = canCancelOrder(order);
 
   return (
-    <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-      <Button className="h-9 border-slate-200 px-3" onClick={onOpen} variant="secondary">
+    <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+      <Button className="h-8 border-slate-200 px-2.5 text-xs" onClick={onOpen} variant="secondary">
         <EyeIcon />
         View/Edit
       </Button>
       {canCancel ? (
         <Button
-          className="h-9 border-amber-200 bg-amber-50 px-3 text-amber-800 hover:border-amber-300 hover:bg-amber-100"
+          className="h-8 border-amber-200 bg-amber-50 px-2.5 text-xs text-amber-800 hover:border-amber-300 hover:bg-amber-100"
           disabled={isWorking}
           onClick={onCancel}
           variant="secondary"

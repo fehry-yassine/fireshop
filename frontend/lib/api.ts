@@ -5,6 +5,8 @@ import type {
   Category,
   HomepagePromo,
   HomepagePromoPayload,
+  Notification,
+  NotificationsResponse,
   Order,
   OrderStatus,
   PaginatedResponse,
@@ -13,9 +15,11 @@ import type {
   ProductRecommendationResponse,
   PublicUser,
   RecommendationLocale,
+  UnreadCountResponse,
   Vendor,
   VendorApplication,
   VendorDashboardStats,
+  VendorStatus,
   VendorOrderUpsertPayload,
   VendorProductPayload,
 } from "@/types";
@@ -500,6 +504,18 @@ export const admin = {
       ),
     list: (query?: { status?: string }) =>
       request<VendorApplication[]>("/admin/vendors", { query }),
+    update: (
+      id: string,
+      payload: {
+        adminNote?: string;
+        isActive?: boolean;
+        status?: VendorStatus;
+      },
+    ) =>
+      request<{ vendor: VendorApplication }>(`/admin/vendors/${id}`, {
+        method: "PATCH",
+        body: payload,
+      }),
   },
   orders: {
     list: (query?: { status?: OrderStatus; page?: number; limit?: number }) =>
@@ -557,12 +573,23 @@ export const admin = {
   },
 };
 
+export const notifications = {
+  list: (query?: { page?: number; limit?: number }) =>
+    request<NotificationsResponse>("/notifications", { query }),
+  unreadCount: () => request<UnreadCountResponse>("/notifications/unread-count"),
+  markAsRead: (id: string) =>
+    request<Notification>(`/notifications/${id}/read`, { method: "PATCH" }),
+  markAllAsRead: () =>
+    request<{ ok: boolean }>("/notifications/read-all", { method: "PATCH" }),
+};
+
 export const api = {
   admin,
   auth,
   cart,
   categories,
   homepagePromos,
+  notifications,
   orders,
   products,
   search,

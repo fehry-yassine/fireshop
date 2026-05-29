@@ -31,6 +31,93 @@ const DELETE_CONFIRMATION_TEXT = "Delete this product permanently? This cannot b
 const DELETE_CAN_DELETE_TITLE = "Delete permanently";
 const DELETE_ORDER_HISTORY_REASON = "Cannot delete: this product is linked to orders. Archive it instead.";
 const DELETE_UNKNOWN_REASON = "Delete availability unknown.";
+const PRODUCT_TABLE_HEADER_CELL_CLASS =
+  "sticky top-0 z-20 whitespace-nowrap bg-slate-50";
+const PRODUCT_TABLE_COLUMNS = [
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto flex w-full justify-center",
+    headerClass: "text-center",
+    key: "image",
+    label: "Image",
+    width: "5%",
+  },
+  {
+    cellClass: "min-w-0 text-center",
+    contentClass: "mx-auto block w-full max-w-[128px] min-w-0",
+    headerClass: "text-center",
+    key: "product",
+    label: "Product",
+    width: "12.5%",
+  },
+  {
+    cellClass: "min-w-0 text-center",
+    contentClass: "mx-auto block w-full max-w-[116px] min-w-0 text-center",
+    headerClass: "text-center",
+    key: "vendor",
+    label: "Seller",
+    width: "10.5%",
+  },
+  {
+    cellClass: "min-w-0 text-center",
+    contentClass: "mx-auto block w-full max-w-[136px] min-w-0 text-center",
+    headerClass: "text-center",
+    key: "category",
+    label: "Category",
+    width: "12%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto block w-full text-center",
+    headerClass: "text-center",
+    key: "price",
+    label: "Price",
+    width: "8%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto block w-full text-center",
+    headerClass: "text-center",
+    key: "stock",
+    label: "Stock",
+    width: "5.5%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto flex w-full justify-center",
+    headerClass: "text-center",
+    key: "status",
+    label: "Status",
+    width: "10.5%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto block w-full text-center",
+    headerClass: "text-center",
+    key: "created",
+    label: "Created",
+    width: "9.5%",
+  },
+  {
+    cellClass: "text-center",
+    contentClass: "mx-auto flex w-full justify-center",
+    headerClass: "text-center",
+    key: "actions",
+    label: "Actions",
+    width: "26.5%",
+  },
+] as const;
+const PRODUCT_TABLE_COLUMN = {
+  actions: PRODUCT_TABLE_COLUMNS[8],
+  category: PRODUCT_TABLE_COLUMNS[3],
+  created: PRODUCT_TABLE_COLUMNS[7],
+  image: PRODUCT_TABLE_COLUMNS[0],
+  price: PRODUCT_TABLE_COLUMNS[4],
+  product: PRODUCT_TABLE_COLUMNS[1],
+  status: PRODUCT_TABLE_COLUMNS[6],
+  stock: PRODUCT_TABLE_COLUMNS[5],
+  vendor: PRODUCT_TABLE_COLUMNS[2],
+} as const;
 
 export function AdminProductsPageClient() {
   return (
@@ -269,44 +356,70 @@ function AdminProductsContent() {
     }
   }
 
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("ALL");
+    setVendorFilter("ALL");
+    setCategoryFilter("ALL");
+    setPage(1);
+  }
+
   const vendorsForFilter = useMemo(
     () => vendors.filter((vendor) => vendor.isActive && vendor.status === "APPROVED"),
     [vendors],
   );
+  const hasFilters =
+    search.trim().length > 0 ||
+    statusFilter !== "ALL" ||
+    vendorFilter !== "ALL" ||
+    categoryFilter !== "ALL";
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <p className="text-sm font-semibold text-market-700">Catalog moderation</p>
-        <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl">Product Review</h2>
-        <p className="max-w-2xl text-sm leading-6 text-slate-600">
-          Review vendor submissions and control marketplace visibility.
-        </p>
+    <div className="admin-page-shell">
+      <div className="admin-page-header">
+        <div className="space-y-2">
+          <p className="admin-page-eyebrow">Catalog moderation</p>
+          <h2 className="admin-page-title">Product Review</h2>
+          <p className="admin-page-description">
+            Review vendor submissions and control marketplace visibility.
+          </p>
+        </div>
+        <div className="admin-header-badge">
+          {stats.pendingReview} pending
+        </div>
       </div>
 
       {message ? <InlineMessage message={message} /> : null}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="admin-kpi-grid">
         <MetricCard label="Pending review" value={stats.pendingReview} tone="warning" />
         <MetricCard label="Published" value={stats.published} tone="success" />
         <MetricCard label="Rejected" value={stats.rejected} tone="danger" />
         <MetricCard label="Archived" value={stats.archived} tone="neutral" />
       </div>
 
-      <Card>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_200px_220px_220px_auto] lg:items-center">
-            <Input
-              onChange={(event) => {
-                setPage(1);
-                setSearch(event.target.value);
-              }}
-              placeholder="Search by product, vendor, slug, category"
-              type="search"
-              value={search}
-            />
+      <Card className="admin-surface-card">
+        <CardContent className="space-y-3 p-4">
+          <div className="admin-filter-bar grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(300px,1fr)_155px_minmax(160px,190px)_minmax(160px,190px)_auto] xl:items-center">
+            <div className="relative md:col-span-2 xl:col-span-1">
+              <Input
+                aria-label="Search products"
+                className="pl-9"
+                onChange={(event) => {
+                  setPage(1);
+                  setSearch(event.target.value);
+                }}
+                placeholder="Search by product, vendor, slug, category"
+                type="search"
+                value={search}
+              />
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <SearchIcon />
+              </span>
+            </div>
             <select
-              className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
+              aria-label="Filter product status"
+              className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
               onChange={(event) => {
                 setPage(1);
                 setStatusFilter(event.target.value as ProductStatusFilter);
@@ -321,7 +434,8 @@ function AdminProductsContent() {
               <option value="ARCHIVED">Archived</option>
             </select>
             <select
-              className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
+              aria-label="Filter product vendor"
+              className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
               onChange={(event) => {
                 setPage(1);
                 setVendorFilter(event.target.value);
@@ -336,7 +450,8 @@ function AdminProductsContent() {
               ))}
             </select>
             <select
-              className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
+              aria-label="Filter product category"
+              className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
               onChange={(event) => {
                 setPage(1);
                 setCategoryFilter(event.target.value);
@@ -350,9 +465,19 @@ function AdminProductsContent() {
                 </option>
               ))}
             </select>
-            <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
-              {items.length} shown
-            </p>
+            <div className="grid grid-cols-[1fr_auto] gap-3 xl:grid-cols-[auto_auto]">
+              <div className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-slate-100 px-3 text-sm font-bold text-slate-700">
+                {items.length} shown
+              </div>
+              <Button
+                className="h-10 border-slate-200 px-3"
+                disabled={!hasFilters}
+                onClick={clearFilters}
+                variant="secondary"
+              >
+                Clear
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -360,62 +485,97 @@ function AdminProductsContent() {
           ) : items.length === 0 ? (
             <EmptyPanel text="No products match these filters." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-[1100px] w-full border-collapse text-sm">
+            <div
+              className="admin-table-shell overflow-auto bg-white"
+              style={{ maxHeight: "clamp(420px, calc(100vh - 390px), 620px)" }}
+            >
+              <table className="admin-table min-w-[1180px] table-fixed xl:min-w-full">
+                <colgroup>
+                  {PRODUCT_TABLE_COLUMNS.map((column) => (
+                    <col key={column.label} style={{ width: column.width }} />
+                  ))}
+                </colgroup>
                 <thead>
-                  <tr className="border-b text-left text-xs font-bold uppercase tracking-normal text-slate-600">
-                    <th className="px-4 py-3">Image</th>
-                    <th className="px-4 py-3">Product</th>
-                    <th className="px-4 py-3">Vendor</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Price</th>
-                    <th className="px-4 py-3">Stock</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Created</th>
-                    <th className="whitespace-nowrap px-4 py-3 text-right">Actions</th>
+                  <tr>
+                    {PRODUCT_TABLE_COLUMNS.map((column) => (
+                      <th
+                        className={`${PRODUCT_TABLE_HEADER_CELL_CLASS} ${column.headerClass}`}
+                        key={column.key}
+                      >
+                        <span className={column.contentClass}>
+                          {column.label}
+                        </span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item) => (
-                    <tr className="border-b align-middle" key={item.id}>
-                      <td className="px-4 py-3">
-                        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                          {item.image ? (
-                            <img alt={item.name} className="h-full w-full object-cover" src={item.image} />
-                          ) : (
-                            <span className="text-xs font-semibold text-slate-400">IMG</span>
-                          )}
+                    <tr className="align-middle" key={item.id}>
+                      <td className={PRODUCT_TABLE_COLUMN.image.cellClass}>
+                        <div className={PRODUCT_TABLE_COLUMN.image.contentClass}>
+                          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                            {item.image ? (
+                              <img alt={item.name} className="h-full w-full object-cover" src={item.image} />
+                            ) : (
+                              <span className="text-xs font-semibold text-slate-400">IMG</span>
+                            )}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-950">{item.name}</p>
-                        <p className="text-xs text-slate-500">{item.slug}</p>
+                      <td className={PRODUCT_TABLE_COLUMN.product.cellClass}>
+                        <div className={PRODUCT_TABLE_COLUMN.product.contentClass}>
+                          <p className="block max-w-full truncate text-left font-bold text-slate-950">{item.name}</p>
+                          <p className="block max-w-full truncate text-left text-xs text-slate-500">{item.slug}</p>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{item.vendorName}</td>
-                      <td className="px-4 py-3 text-slate-700">{item.categoryName}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-950">
-                        {formatTnd(item.price)}
+                      <td className={PRODUCT_TABLE_COLUMN.vendor.cellClass}>
+                        <p className={`truncate text-slate-700 ${PRODUCT_TABLE_COLUMN.vendor.contentClass}`}>
+                          {item.vendorName}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{item.stock}</td>
-                      <td className="px-4 py-3">
-                        <ProductStatusBadge status={item.status} />
+                      <td className={PRODUCT_TABLE_COLUMN.category.cellClass}>
+                        <p className={`truncate text-slate-700 ${PRODUCT_TABLE_COLUMN.category.contentClass}`}>
+                          {item.categoryName}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{formatDateTime(item.createdAt)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <ProductActionButtons
-                          isWorking={activeProductId === item.id}
-                          mode="row"
-                          onApprove={() => approveProduct(item.id)}
-                          onArchive={() => archiveProduct(item.id)}
-                          onDelete={() => setDeleteDialogProduct(item)}
-                          onReject={() => {
-                            setRejectDialogProduct(item);
-                            setRejectReason("");
-                          }}
-                          onRepublish={() => republishProduct(item.id)}
-                          onView={() => openDrawer(item.id)}
-                          product={item}
-                        />
+                      <td className={`whitespace-nowrap font-semibold tabular-nums text-slate-950 ${PRODUCT_TABLE_COLUMN.price.cellClass}`}>
+                        <span className={PRODUCT_TABLE_COLUMN.price.contentClass}>
+                          {formatTnd(item.price)}
+                        </span>
+                      </td>
+                      <td className={`whitespace-nowrap tabular-nums text-slate-700 ${PRODUCT_TABLE_COLUMN.stock.cellClass}`}>
+                        <span className={PRODUCT_TABLE_COLUMN.stock.contentClass}>
+                          {item.stock}
+                        </span>
+                      </td>
+                      <td className={PRODUCT_TABLE_COLUMN.status.cellClass}>
+                        <div className={PRODUCT_TABLE_COLUMN.status.contentClass}>
+                          <ProductStatusBadge status={item.status} />
+                        </div>
+                      </td>
+                      <td className={`whitespace-nowrap text-slate-700 ${PRODUCT_TABLE_COLUMN.created.cellClass}`}>
+                        <span className={PRODUCT_TABLE_COLUMN.created.contentClass}>
+                          {formatProductTableDate(item.createdAt)}
+                        </span>
+                      </td>
+                      <td className={`whitespace-nowrap ${PRODUCT_TABLE_COLUMN.actions.cellClass}`}>
+                        <div className={PRODUCT_TABLE_COLUMN.actions.contentClass}>
+                          <ProductActionButtons
+                            isWorking={activeProductId === item.id}
+                            mode="row"
+                            onApprove={() => approveProduct(item.id)}
+                            onArchive={() => archiveProduct(item.id)}
+                            onDelete={() => setDeleteDialogProduct(item)}
+                            onReject={() => {
+                              setRejectDialogProduct(item);
+                              setRejectReason("");
+                            }}
+                            onRepublish={() => republishProduct(item.id)}
+                            onView={() => openDrawer(item.id)}
+                            product={item}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -452,9 +612,9 @@ function AdminProductsContent() {
         description="Review vendor submission details and control marketplace visibility."
         eyebrow="Product review"
         footer={
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
-              className="h-9 border-slate-200 px-3"
+              className="h-9 shrink-0 border-slate-200 px-3"
               onClick={() => setDrawerOpen(false)}
               variant="secondary"
             >
@@ -606,18 +766,19 @@ function ProductActionButtons({
   showView?: boolean;
 }) {
   const isRow = mode === "row";
-  const buttonSizeClass = isRow ? "h-10" : "h-9";
+  const buttonSizeClass = isRow ? "!h-8 !text-[11px]" : "h-9";
+  const buttonPaddingClass = isRow ? "!gap-1 !px-2" : "px-3";
 
   return (
     <div
       className={
         isRow
-          ? "flex items-center justify-end gap-2 whitespace-nowrap"
+          ? "flex w-max max-w-full items-center justify-center gap-1 whitespace-nowrap"
           : "flex flex-wrap items-center justify-end gap-2"
       }
     >
       {showView && onView ? (
-        <Button className={`${buttonSizeClass} border-slate-200 px-3`} onClick={onView} variant="secondary">
+        <Button className={`${buttonSizeClass} border-slate-200 ${buttonPaddingClass}`} onClick={onView} variant="secondary">
           <EyeIcon />
           View
         </Button>
@@ -625,7 +786,7 @@ function ProductActionButtons({
 
       {product.status === "PENDING_REVIEW" ? (
         <Button
-          className={`${buttonSizeClass} bg-market-600 px-3 shadow-sm shadow-market-600/20 hover:bg-market-700`}
+          className={`${buttonSizeClass} bg-market-600 ${buttonPaddingClass} shadow-sm shadow-market-600/20 hover:bg-market-700`}
           disabled={isWorking}
           onClick={onApprove}
         >
@@ -636,7 +797,7 @@ function ProductActionButtons({
 
       {product.status === "PENDING_REVIEW" ? (
         <Button
-          className={`${buttonSizeClass} border-red-200 bg-white px-3 text-red-700 hover:border-red-300 hover:bg-red-50`}
+          className={`${buttonSizeClass} border-red-200 bg-white ${buttonPaddingClass} text-red-700 hover:border-red-300 hover:bg-red-50`}
           disabled={isWorking}
           onClick={onReject}
           variant="secondary"
@@ -648,7 +809,7 @@ function ProductActionButtons({
 
       {product.status === "PUBLISHED" ? (
         <Button
-          className={`${buttonSizeClass} border-slate-300 px-3 text-slate-700 hover:border-slate-400 hover:bg-slate-100`}
+          className={`${buttonSizeClass} border-slate-300 ${buttonPaddingClass} text-slate-700 hover:border-slate-400 hover:bg-slate-100`}
           disabled={isWorking}
           onClick={onArchive}
           variant="secondary"
@@ -660,7 +821,7 @@ function ProductActionButtons({
 
       {product.status === "ARCHIVED" ? (
         <Button
-          className={`${buttonSizeClass} border-market-200 bg-market-50 px-3 text-market-800 hover:border-market-300 hover:bg-market-100`}
+          className={`${buttonSizeClass} border-market-200 bg-market-50 ${buttonPaddingClass} text-market-800 hover:border-market-300 hover:bg-market-100`}
           disabled={isWorking}
           onClick={onRepublish}
           variant="secondary"
@@ -703,7 +864,7 @@ function ProductDeleteAction({
       <span className="inline-flex" title={title}>
         <button
           aria-label={title}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/25 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/25 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           disabled={isDisabled}
           onClick={deleteAvailability.canDelete ? onDelete : undefined}
           type="button"
@@ -779,6 +940,24 @@ function ProductDeleteHistoryNote({
   );
 }
 
+function formatProductTableDate(value: string | undefined) {
+  if (!value) {
+    return "Not available";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 function toListItemFromDetails(product: AdminProductDetails): AdminProductListItem {
   return {
     id: product.id,
@@ -798,23 +977,25 @@ function toListItemFromDetails(product: AdminProductDetails): AdminProductListIt
 }
 
 function ProductStatusBadge({ status }: { status: Product["status"] }) {
+  const badgeClass = "px-2 py-1 text-[11px]";
+
   if (status === "DRAFT") {
-    return <Badge tone="neutral">Draft</Badge>;
+    return <Badge className={badgeClass} tone="neutral">Draft</Badge>;
   }
 
   if (status === "PENDING_REVIEW") {
-    return <Badge tone="warning">Pending review</Badge>;
+    return <Badge className={badgeClass} tone="warning">Pending review</Badge>;
   }
 
   if (status === "PUBLISHED") {
-    return <Badge tone="success">Published</Badge>;
+    return <Badge className={badgeClass} tone="success">Published</Badge>;
   }
 
   if (status === "REJECTED") {
-    return <Badge className="bg-red-50 text-red-700" tone="neutral">Rejected</Badge>;
+    return <Badge className={`bg-red-50 text-red-700 ${badgeClass}`} tone="neutral">Rejected</Badge>;
   }
 
-  return <Badge className="!border-slate-800 !bg-slate-900 !text-white" tone="neutral">Archived</Badge>;
+  return <Badge className={`!border-slate-800 !bg-slate-900 !text-white ${badgeClass}`} tone="neutral">Archived</Badge>;
 }
 
 function MetricCard({
@@ -834,13 +1015,13 @@ function MetricCard({
   }[tone];
 
   return (
-    <Card>
-      <CardContent className="space-y-2">
-        <p className="text-sm font-semibold text-slate-600">{label}</p>
-        <div className={`inline-flex rounded-lg border px-3 py-1 text-xs font-semibold ${toneClass}`}>
-          {label}
+    <Card className="admin-kpi-card">
+      <CardContent className="admin-kpi-card-content">
+        <div>
+          <p className="admin-kpi-label">{label}</p>
+          <p className="admin-kpi-value">{value}</p>
         </div>
-        <p className="text-3xl font-bold text-slate-950">{value}</p>
+        <span className={`admin-kpi-dot ${toneClass}`} />
       </CardContent>
     </Card>
   );
@@ -990,6 +1171,19 @@ function DeleteProductDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path
+        d="m21 21-4.3-4.3m1.3-5.2a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
   );
 }
 
