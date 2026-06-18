@@ -42,7 +42,7 @@ function VendorOverview() {
         }
       } catch (error) {
         if (isActive) {
-          setMessage(error instanceof Error ? error.message : "Could not load vendor dashboard.");
+          setMessage(error instanceof Error ? error.message : "Impossible de charger le tableau de bord vendeur.");
         }
       } finally {
         if (isActive) {
@@ -67,22 +67,24 @@ function VendorOverview() {
   const expectedRevenue = stats?.expectedRevenue;
   const revenueNote =
     typeof expectedRevenue === "number"
-      ? `Expected: ${formatTnd(expectedRevenue)}`
-      : `${totalOrders} order${totalOrders === 1 ? "" : "s"}`;
+      ? `Attendu : ${formatTnd(expectedRevenue)}`
+      : `${totalOrders} commande${totalOrders === 1 ? "" : "s"}`;
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-5">
+      <FirstStepsGuide />
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Orders today" value={isLoading ? "--" : `${stats?.ordersToday ?? 0}`} />
-        <MetricCard label="Orders this week" value={isLoading ? "--" : `${stats?.ordersThisWeek ?? 0}`} />
+        <MetricCard label="Commandes aujourd'hui" value={isLoading ? "--" : `${stats?.ordersToday ?? 0}`} />
+        <MetricCard label="Commandes cette semaine" value={isLoading ? "--" : `${stats?.ordersThisWeek ?? 0}`} />
         <MetricCard
-          label="Orders this month"
+          label="Commandes ce mois-ci"
           value={isLoading ? "--" : `${stats?.ordersThisMonth ?? 0}`}
-          note={`${deliveredOrders} delivered`}
+          note={`${deliveredOrders} livrées`}
         />
         <MetricCard
           highlight
-          label="Total revenue"
+          label="Revenu total"
           value={isLoading ? "--" : formatTnd(deliveredRevenue)}
           note={isLoading ? undefined : revenueNote}
         />
@@ -91,14 +93,14 @@ function VendorOverview() {
       <Card className="vendor-card !rounded-[14px]">
         <CardContent className="space-y-5 p-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <h3 className="vendor-title text-[1.55rem] font-bold leading-tight sm:text-[1.7rem]">Order tracking</h3>
+            <h3 className="vendor-title text-[1.55rem] font-bold leading-tight sm:text-[1.7rem]">Suivi des commandes</h3>
             <div className="vendor-muted flex flex-wrap items-center gap-4 text-sm font-semibold">
-              <span>Delivered {totalOrders ? Math.round((deliveredOrders / totalOrders) * 100) : 0}%</span>
-              <span>Returned {totalOrders ? Math.round((returnedOrders / totalOrders) * 100) : 0}%</span>
+              <span>Livrées {totalOrders ? Math.round((deliveredOrders / totalOrders) * 100) : 0}%</span>
+              <span>Retournées {totalOrders ? Math.round((returnedOrders / totalOrders) * 100) : 0}%</span>
             </div>
           </div>
           <div className="vendor-progress-callout flex h-[54px] items-center justify-center rounded-full px-5 text-center text-[1.15rem] font-bold leading-none sm:text-[1.2rem]">
-            {isLoading ? "Loading..." : totalOrders === 0 ? "No data available" : `${openOrders} open orders in progress`}
+            {isLoading ? "Chargement…" : totalOrders === 0 ? "Aucune donnée disponible" : `${openOrders} commande${openOrders === 1 ? "" : "s"} en cours`}
           </div>
         </CardContent>
       </Card>
@@ -108,17 +110,17 @@ function VendorOverview() {
           <CardContent className="space-y-4 p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h3 className="vendor-title text-[1.3rem] font-bold leading-tight sm:text-[1.4rem]">Recent received orders</h3>
-                <p className="vendor-muted text-sm">Newest COD orders for your store.</p>
+                <h3 className="vendor-title text-[1.3rem] font-bold leading-tight sm:text-[1.4rem]">Commandes récentes</h3>
+                <p className="vendor-muted text-sm">Dernières commandes COD de votre boutique.</p>
               </div>
               <Link className="vendor-accent-text text-sm font-semibold" href="/vendor/orders">
-                View all
+                Voir tout
               </Link>
             </div>
 
             {isLoading ? (
               <p className="vendor-empty-state rounded-lg px-3 py-4 text-sm">
-                Loading recent orders.
+                Chargement des commandes récentes.
               </p>
             ) : message ? (
               <p className="vendor-alert-error rounded-lg px-3 py-4 text-sm">
@@ -126,7 +128,7 @@ function VendorOverview() {
               </p>
             ) : recentOrders.length === 0 ? (
               <p className="vendor-empty-state rounded-lg px-3 py-4 text-sm">
-                No received orders yet.
+                Aucune commande reçue pour le moment.
               </p>
             ) : (
               <div className="space-y-3">
@@ -140,7 +142,7 @@ function VendorOverview() {
 
         <Card className="vendor-card !rounded-[14px] min-h-[360px]">
           <CardContent className="space-y-4 p-6">
-            <h3 className="vendor-title text-[1.3rem] font-bold leading-tight sm:text-[1.4rem]">Orders traffic</h3>
+            <h3 className="vendor-title text-[1.3rem] font-bold leading-tight sm:text-[1.4rem]">Répartition des commandes</h3>
             <div className="vendor-panel-inset flex min-h-[270px] items-center justify-center rounded-[14px] border p-5">
               <div className="vendor-donut relative h-40 w-40 rounded-full border-[24px] sm:h-44 sm:w-44 sm:border-[26px]">
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
@@ -151,16 +153,44 @@ function VendorOverview() {
             </div>
             <div className="grid grid-cols-2 gap-2 text-center text-sm font-semibold">
               <p className="vendor-soft-pill rounded-lg px-2 py-2">
-                {totalOrders ? Math.round((openOrders / totalOrders) * 100) : 0}% Open
+                {totalOrders ? Math.round((openOrders / totalOrders) * 100) : 0}% En cours
               </p>
               <p className="vendor-chip rounded-lg px-2 py-2">
-                {totalOrders ? Math.round((deliveredOrders / totalOrders) * 100) : 0}% Delivered
+                {totalOrders ? Math.round((deliveredOrders / totalOrders) * 100) : 0}% Livrées
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
     </div>
+  );
+}
+
+function FirstStepsGuide() {
+  return (
+    <Card className="vendor-card !rounded-[14px]">
+      <CardContent className="flex flex-col gap-4 p-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-2">
+          <h3 className="vendor-title text-[1.4rem] font-bold leading-tight sm:text-[1.5rem]">
+            Commencez à vendre sur FireShop
+          </h3>
+          <p className="vendor-muted max-w-2xl text-sm leading-6">
+            Ajoutez votre premier produit, envoyez-le en validation, puis recevez vos premières
+            commandes COD après approbation.
+          </p>
+          <p className="vendor-muted max-w-2xl text-xs leading-5">
+            Les produits publiés par un vendeur passent par une validation admin avant d&apos;être
+            visibles aux acheteurs.
+          </p>
+        </div>
+        <Link
+          className="vendor-primary-action inline-flex h-11 shrink-0 items-center justify-center rounded-lg px-5 text-sm font-bold transition-colors"
+          href="/vendor/products"
+        >
+          Ajouter mon premier produit
+        </Link>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -227,7 +257,7 @@ function formatDateTime(value: string) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-TN", {
+  return new Intl.DateTimeFormat("fr-TN", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);

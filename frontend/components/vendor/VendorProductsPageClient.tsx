@@ -94,7 +94,7 @@ function VendorProductsContent() {
         }
       } catch (error) {
         setMessage({
-          text: getProductError(error, "Could not load vendor products."),
+          text: getProductError(error, "Impossible de charger vos produits."),
           tone: "error",
         });
       } finally {
@@ -151,12 +151,12 @@ function VendorProductsContent() {
         current.map((item) => (item.id === product.id ? archivedProduct : item)),
       );
       setMessage({
-        text: "Product archived.",
+        text: "Produit archivé.",
         tone: "success",
       });
     } catch (error) {
       setMessage({
-        text: getProductError(error, "Could not archive product."),
+        text: getProductError(error, "Impossible d'archiver le produit."),
         tone: "error",
       });
     } finally {
@@ -181,7 +181,7 @@ function VendorProductsContent() {
         current.map((item) => (item.id === product.id ? publishedProduct : item)),
       );
       setMessage({
-        text: "Product submitted for admin review.",
+        text: "Produit envoyé en validation.",
         tone: "success",
       });
     } catch (error) {
@@ -189,7 +189,7 @@ function VendorProductsContent() {
         current.map((item) => (item.id === product.id ? previousProduct : item)),
       );
       setMessage({
-        text: getProductError(error, "Could not publish product."),
+        text: getProductError(error, "Impossible d'envoyer le produit en validation."),
         tone: "error",
       });
     } finally {
@@ -203,31 +203,31 @@ function VendorProductsContent() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex justify-end">
         <Button
           className="vendor-primary-action h-11 px-5"
           onClick={() => setPanelState({ mode: "create" })}
         >
-          + Add Product
+          + Ajouter un produit
         </Button>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <InventoryMetric label="Total Products" value={isLoading ? "--" : `${stats.total}`} />
-        <InventoryMetric label="Published" tone="success" value={isLoading ? "--" : `${stats.published}`} />
-        <InventoryMetric label="Pending Review" tone="warning" value={isLoading ? "--" : `${stats.pending}`} />
-        <InventoryMetric label="Out of Stock" tone="danger" value={isLoading ? "--" : `${stats.outOfStock}`} />
+        <InventoryMetric label="Total produits" value={isLoading ? "--" : `${stats.total}`} />
+        <InventoryMetric label="Publiés" tone="success" value={isLoading ? "--" : `${stats.published}`} />
+        <InventoryMetric label="En validation" tone="warning" value={isLoading ? "--" : `${stats.pending}`} />
+        <InventoryMetric label="Rupture de stock" tone="danger" value={isLoading ? "--" : `${stats.outOfStock}`} />
       </div>
 
       <Card className="vendor-card overflow-hidden">
         <div className="vendor-toolbar border-b px-4 py-4 sm:px-5">
           <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_200px_200px_auto] lg:items-center">
             <Input
-              aria-label="Search products"
+              aria-label="Rechercher un produit"
               className="vendor-input h-12 text-base"
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search products..."
+              placeholder="Rechercher un produit..."
               type="search"
               value={search}
             />
@@ -237,7 +237,7 @@ function VendorProductsContent() {
               onChange={(event) => setCategoryFilter(event.target.value)}
               value={categoryFilter}
             >
-              <option value="ALL">All categories</option>
+              <option value="ALL">Toutes les catégories</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -250,32 +250,32 @@ function VendorProductsContent() {
               onChange={(event) => setStatusFilter(event.target.value as ProductStatusFilter)}
               value={statusFilter}
             >
-              <option value="ALL">All statuses</option>
-              <option value="DRAFT">Draft</option>
-              <option value="PENDING_REVIEW">Pending review</option>
-              <option value="PUBLISHED">Published</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="ARCHIVED">Archived</option>
+              <option value="ALL">Tous les statuts</option>
+              <option value="DRAFT">Brouillon</option>
+              <option value="PENDING_REVIEW">En validation</option>
+              <option value="PUBLISHED">Publié</option>
+              <option value="REJECTED">Refusé</option>
+              <option value="ARCHIVED">Archivé</option>
             </select>
 
             <div className="vendor-chip rounded-lg px-4 py-3 text-sm font-semibold">
-              {filteredProducts.length} shown
+              {filteredProducts.length} affichés
             </div>
           </div>
         </div>
 
         {isLoading ? (
           <CardContent className="py-12 text-center">
-            <p className="vendor-title text-sm font-semibold">Loading products</p>
-            <p className="vendor-muted mt-2 text-sm">Please wait a moment.</p>
+            <p className="vendor-title text-sm font-semibold">Chargement des produits</p>
+            <p className="vendor-muted mt-2 text-sm">Veuillez patienter un instant.</p>
           </CardContent>
         ) : products.length === 0 ? (
           <EmptyProductsState onAdd={() => setPanelState({ mode: "create" })} />
         ) : filteredProducts.length === 0 ? (
           <CardContent className="py-12 text-center">
-            <p className="vendor-title text-lg font-bold">No matching products</p>
+            <p className="vendor-title text-lg font-bold">Aucun produit correspondant</p>
             <p className="vendor-muted mt-2 text-sm">
-              Adjust search or filters to see more inventory.
+              Modifiez la recherche ou les filtres pour voir plus de produits.
             </p>
           </CardContent>
         ) : (
@@ -284,12 +284,12 @@ function VendorProductsContent() {
               <thead>
                 <tr className="vendor-table-head border-b text-left text-xs font-bold uppercase tracking-normal">
                   <th className="px-6 py-4">ID</th>
-                  <th className="px-6 py-4">Product Image</th>
-                  <th className="px-6 py-4">Product Name</th>
-                  <th className="px-6 py-4">Price</th>
+                  <th className="px-6 py-4">Image</th>
+                  <th className="px-6 py-4">Nom du produit</th>
+                  <th className="px-6 py-4">Prix</th>
                   <th className="px-6 py-4">Stock</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Created date</th>
+                  <th className="px-6 py-4">Statut</th>
+                  <th className="px-6 py-4">Date de création</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -320,11 +320,11 @@ function VendorProductsContent() {
       />
 
       <DashboardDrawer
-        description="Create and update product details, inventory, pricing, images, and publish state."
-        eyebrow="Product editor"
+        description="Créez et mettez à jour les informations, le stock, le prix, les images et la publication du produit."
+        eyebrow="Éditeur de produit"
         onClose={() => setPanelState(null)}
         open={panelState !== null}
-        title={panelState?.mode === "edit" ? "Edit product" : "Create product"}
+        title={panelState?.mode === "edit" ? "Modifier le produit" : "Créer un produit"}
         width="xl"
       >
         {panelState ? (
@@ -420,8 +420,8 @@ function ProductRow({
           {product.status === "REJECTED" ? (
             <p className="mt-2 text-xs font-semibold text-red-500">
               {product.rejectionReason
-                ? `Rejection reason: ${product.rejectionReason}`
-                : "Product rejected. Fix required fields and publish again."}
+                ? `Motif de refus : ${product.rejectionReason}`
+                : "Produit refusé. Corrigez les champs requis puis renvoyez-le en validation."}
             </p>
           ) : null}
         </td>
@@ -441,13 +441,13 @@ function ProductRow({
           <div className="flex justify-end gap-2">
             <IconLink
               href={`/vendor/products/${product.id}`}
-              label={`View ${product.name}`}
+              label={`Voir ${product.name}`}
             >
               <EyeIcon />
             </IconLink>
             <IconButton
               disabled={isActive || !canEdit}
-              label={`Edit ${product.name}`}
+              label={`Modifier ${product.name}`}
               onClick={onEdit}
             >
               <PencilIcon />
@@ -455,7 +455,7 @@ function ProductRow({
             {canPublish ? (
               <IconButton
                 disabled={isActive}
-                label={`Publish ${product.name}`}
+                label={`Envoyer ${product.name} en validation`}
                 onClick={onPublish}
               >
                 <PublishIcon />
@@ -465,10 +465,10 @@ function ProductRow({
               disabled={isActive || !canArchive}
               label={
                 product.status === "ARCHIVED"
-                  ? `${product.name} is archived`
+                  ? `${product.name} est archivé`
                   : isUnderReview
-                    ? `${product.name} is under review`
-                  : `Archive ${product.name}`
+                    ? `${product.name} est en validation`
+                  : `Archiver ${product.name}`
               }
               onClick={onArchive}
             >
@@ -485,7 +485,7 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
   if (status === "DRAFT") {
     return (
       <Badge className="vendor-status-neutral" tone="neutral">
-        Draft
+        Brouillon
       </Badge>
     );
   }
@@ -493,7 +493,7 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
   if (status === "PUBLISHED") {
     return (
       <Badge className="vendor-status-success" tone="neutral">
-        Published
+        Publié
       </Badge>
     );
   }
@@ -501,7 +501,7 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
   if (status === "PENDING_REVIEW") {
     return (
       <Badge className="vendor-status-warning" tone="neutral">
-        Pending review
+        En validation
       </Badge>
     );
   }
@@ -509,12 +509,12 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
   if (status === "REJECTED") {
     return (
       <Badge className="vendor-status-danger" tone="neutral">
-        Rejected
+        Refusé
       </Badge>
     );
   }
 
-  return <Badge className="vendor-status-neutral">Archived</Badge>;
+  return <Badge className="vendor-status-neutral">Archivé</Badge>;
 }
 
 function IconLink({
@@ -651,16 +651,16 @@ function EmptyProductsState({ onAdd }: { onAdd?: () => void }) {
       <div className="vendor-soft-pill mx-auto flex h-16 w-16 items-center justify-center rounded-lg text-xl font-bold">
         +
       </div>
-      <h3 className="vendor-title mt-5 text-2xl font-bold">No products yet</h3>
+      <h3 className="vendor-title mt-5 text-2xl font-bold">Aucun produit pour le moment</h3>
       <p className="vendor-muted mx-auto mt-2 max-w-md text-sm leading-6">
-        Add your first product, publish it for review, then track status and
-        stock from this seller dashboard.
+        Ajoutez votre premier produit. Il sera vérifié par l&apos;administration FireShop
+        avant d&apos;être visible aux acheteurs.
       </p>
       <Button
         className="vendor-primary-action mt-5 h-11 px-5"
         onClick={onAdd}
       >
-        Add first product
+        Ajouter mon premier produit
       </Button>
     </CardContent>
   );
@@ -688,7 +688,7 @@ function Toast({
       <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-current" />
       <span className="leading-5">{message.text}</span>
       <button
-        aria-label="Dismiss notification"
+        aria-label="Fermer la notification"
         className="vendor-muted ml-2 transition-colors hover:opacity-80"
         onClick={onClose}
         type="button"
@@ -717,10 +717,10 @@ function ArchiveConfirmDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
       <div className="vendor-dialog w-full max-w-md rounded-lg border p-5">
-        <p className="vendor-title text-lg font-bold">Archive product?</p>
+        <p className="vendor-title text-lg font-bold">Archiver le produit ?</p>
         <p className="vendor-muted mt-2 text-sm leading-6">
-          {product.name} will be removed from the public marketplace catalog. This
-          is different from Hidden visibility.
+          {product.name} sera retiré du catalogue public de FireShop et ne sera plus
+          visible par les acheteurs.
         </p>
         <div className="mt-5 flex justify-end gap-3">
           <Button
@@ -728,14 +728,14 @@ function ArchiveConfirmDialog({
             onClick={onCancel}
             variant="secondary"
           >
-            Cancel
+            Annuler
           </Button>
           <Button
             className="vendor-primary-action"
             disabled={isArchiving}
             onClick={onConfirm}
           >
-            {isArchiving ? "Archiving" : "Archive"}
+            {isArchiving ? "Archivage" : "Archiver"}
           </Button>
         </div>
       </div>
@@ -757,7 +757,7 @@ function getProductError(error: unknown, fallback: string) {
 
 function formatDate(value: string | undefined) {
   if (!value) {
-    return "Not available";
+    return "Non disponible";
   }
 
   const date = new Date(value);
@@ -766,7 +766,7 @@ function formatDate(value: string | undefined) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-TN", {
+  return new Intl.DateTimeFormat("fr-TN", {
     dateStyle: "medium",
   }).format(date);
 }

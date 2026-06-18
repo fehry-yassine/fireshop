@@ -17,6 +17,18 @@ type BackofficeLink = {
   label: string;
 };
 
+type BackofficeChrome = {
+  showSupportCard?: boolean;
+  accountMenuTitle?: string;
+  signedInAsLabel?: string;
+  logoutLabel?: string;
+  loggingOutLabel?: string;
+  themeDarkLabel?: string;
+  themeLightLabel?: string;
+  themeAriaDark?: string;
+  themeAriaLight?: string;
+};
+
 type BackofficeFrameProps = {
   brand?: "default" | "fireshop";
   children: ReactNode;
@@ -32,13 +44,17 @@ type BackofficeFrameProps = {
   user?: PublicUser;
   workspaceDisabledActionLabel?: string;
   workspacePanelTitle?: string;
+  chrome?: BackofficeChrome;
 };
 
 type VendorTheme = "dark" | "light";
 
 const VENDOR_THEME_STORAGE_KEY = "fireshop-vendor-theme";
+const SIDEBAR_COLLAPSED_KEY = "fireshop-sidebar-collapsed";
 const FIRESHOP_SIDEBAR_GRID_CLASS = "lg:grid-cols-[240px_minmax(0,1fr)]";
 const DEFAULT_SIDEBAR_GRID_CLASS = "lg:grid-cols-[248px_minmax(0,1fr)]";
+const FIRESHOP_SIDEBAR_COLLAPSED_GRID_CLASS = "lg:grid-cols-[64px_minmax(0,1fr)]";
+const DEFAULT_SIDEBAR_COLLAPSED_GRID_CLASS = "lg:grid-cols-[64px_minmax(0,1fr)]";
 
 export function BackofficeFrame({
   brand = "default",
@@ -55,19 +71,37 @@ export function BackofficeFrame({
   user,
   workspaceDisabledActionLabel,
   workspacePanelTitle,
+  chrome,
 }: BackofficeFrameProps) {
   const router = useRouter();
   const pathname = usePathname();
   const isFireShop = brand === "fireshop";
+  const {
+    showSupportCard = true,
+    accountMenuTitle = "Vendor account",
+    signedInAsLabel = "Signed in as",
+    logoutLabel = "Logout",
+    loggingOutLabel = "Logging out",
+    themeDarkLabel = "Dark",
+    themeLightLabel = "Light",
+    themeAriaDark = "Switch to dark mode",
+    themeAriaLight = "Switch to light mode",
+  } = chrome ?? {};
   const accountName = user?.fullName || panelTitle;
   const initial = accountName.trim().charAt(0).toUpperCase() || "S";
   const [vendorTheme, setVendorTheme] = useState<VendorTheme>("dark");
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const workspaceSelectorRef = useRef<HTMLDivElement | null>(null);
   const workspaceSelectorTitle = workspacePanelTitle ?? (user ? "Stores" : "Workspaces");
   const workspacePanelId = "fireshop-workspace-selector";
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    if (stored === "true") setIsSidebarCollapsed(true);
+  }, []);
 
   useEffect(() => {
     if (!isFireShop) {
@@ -116,6 +150,14 @@ export function BackofficeFrame({
     });
   }
 
+  function toggleSidebar() {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+      return next;
+    });
+  }
+
   async function handleLogout() {
     setIsLoggingOut(true);
 
@@ -132,6 +174,10 @@ export function BackofficeFrame({
     router.refresh();
   }
 
+  const sidebarGridClass = isSidebarCollapsed
+    ? (isFireShop ? FIRESHOP_SIDEBAR_COLLAPSED_GRID_CLASS : DEFAULT_SIDEBAR_COLLAPSED_GRID_CLASS)
+    : (isFireShop ? FIRESHOP_SIDEBAR_GRID_CLASS : DEFAULT_SIDEBAR_GRID_CLASS);
+
   return (
     <section
       data-vendor-theme={isFireShop ? vendorTheme : undefined}
@@ -143,7 +189,7 @@ export function BackofficeFrame({
       <div
         className={cn(
           "grid min-h-screen lg:h-screen",
-          isFireShop ? FIRESHOP_SIDEBAR_GRID_CLASS : DEFAULT_SIDEBAR_GRID_CLASS,
+          sidebarGridClass,
         )}
       >
         <aside
@@ -155,129 +201,144 @@ export function BackofficeFrame({
           )}
         >
           <div className="flex h-full min-h-0 flex-col">
-            <div className="shrink-0 px-1 pb-0 pt-1">
+            <div className={cn("shrink-0 pb-0 pt-1", isSidebarCollapsed ? "flex justify-center px-1" : "px-1")}>
               {isFireShop ? (
-                <div className="vendor-logo-tile relative mx-auto h-[58px] w-full max-w-[148px]">
-                  <Image
-                    alt={logoAlt ?? "FireShop workspace"}
-                    className="object-contain"
-                    fill
-                    priority
-                    sizes="148px"
-                    src={logoSrc ?? "/branding/fireshop-logo.png"}
-                  />
-                </div>
+                isSidebarCollapsed ? (
+                  <div className="relative mx-auto h-9 w-9">
+                    <Image
+                      alt={logoAlt ?? "FireShop"}
+                      className="object-contain"
+                      fill
+                      priority
+                      sizes="36px"
+                      src="/branding/fireshop-mark.png"
+                    />
+                  </div>
+                ) : (
+                  <div className="vendor-logo-tile relative mx-auto h-[58px] w-full max-w-[148px]">
+                    <Image
+                      alt={logoAlt ?? "FireShop workspace"}
+                      className="object-contain"
+                      fill
+                      priority
+                      sizes="148px"
+                      src={logoSrc ?? "/branding/fireshop-logo.png"}
+                    />
+                  </div>
+                )
               ) : null}
             </div>
 
-            <div className="relative mx-1 mt-1 shrink-0" ref={workspaceSelectorRef}>
-              <button
-                aria-controls={workspacePanelId}
-                aria-expanded={isWorkspaceMenuOpen}
-                className={cn(
-                  "vendor-identity-card vendor-workspace-trigger w-full border px-2.5 py-2 text-left",
-                  isWorkspaceMenuOpen ? "vendor-workspace-trigger-open" : undefined,
-                  isFireShop
-                    ? undefined
-                    : "border-white/10 bg-[#8e43db]",
-                )}
-                onClick={() => setIsWorkspaceMenuOpen((isOpen) => !isOpen)}
-                type="button"
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="min-w-0">
-                    <span
-                      className={cn(
-                        "vendor-workspace-label inline-flex min-w-0 max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-bold leading-5",
-                        isFireShop ? undefined : "bg-white/10 text-purple-100",
-                      )}
-                    >
-                      {panelLabel}
-                    </span>
-                    <span className="vendor-title mt-1.5 block truncate text-[15px] font-extrabold leading-tight">
-                      {panelTitle}
-                    </span>
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "vendor-workspace-cue inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-transform duration-200",
-                      isWorkspaceMenuOpen ? "rotate-180" : undefined,
-                    )}
-                  >
-                    <ChevronDownIcon />
-                  </span>
-                </span>
-              </button>
-
-              <div
-                aria-hidden={!isWorkspaceMenuOpen}
-                className={cn(
-                  "vendor-workspace-panel absolute left-0 right-0 top-[calc(100%+5px)] z-30 origin-top rounded-md border p-1 transition-all duration-150 ease-out",
-                  isWorkspaceMenuOpen
-                    ? "translate-y-0 scale-100 opacity-100"
-                    : "pointer-events-none -translate-y-1 scale-[0.98] opacity-0",
-                )}
-                id={workspacePanelId}
-              >
-                <div className="flex items-center justify-between gap-2 px-1.5 pb-0.5">
-                  <p className="vendor-panel-title text-[10px] font-extrabold">
-                    {workspaceSelectorTitle}
-                  </p>
-                  <button
-                    aria-label="Close workspace selector"
-                    className="vendor-workspace-close inline-flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-bold"
-                    onClick={() => setIsWorkspaceMenuOpen(false)}
-                    tabIndex={isWorkspaceMenuOpen ? 0 : -1}
-                    type="button"
-                  >
-                    x
-                  </button>
-                </div>
-                <div className="space-y-0.5">
-                  <button
-                    className="vendor-workspace-row vendor-workspace-row-selected flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left"
-                    onClick={() => setIsWorkspaceMenuOpen(false)}
-                    tabIndex={isWorkspaceMenuOpen ? 0 : -1}
-                    type="button"
-                  >
-                    <span className="vendor-workspace-mark inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
-                      <WorkspaceFlameIcon />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="vendor-title block truncate text-[12px] font-bold leading-4">
+            {!isSidebarCollapsed ? (
+              <div className="relative mx-1 mt-1 shrink-0" ref={workspaceSelectorRef}>
+                <button
+                  aria-controls={workspacePanelId}
+                  aria-expanded={isWorkspaceMenuOpen}
+                  className={cn(
+                    "vendor-identity-card vendor-workspace-trigger w-full border px-2.5 py-2 text-left",
+                    isWorkspaceMenuOpen ? "vendor-workspace-trigger-open" : undefined,
+                    isFireShop
+                      ? undefined
+                      : "border-white/10 bg-[#8e43db]",
+                  )}
+                  onClick={() => setIsWorkspaceMenuOpen((isOpen) => !isOpen)}
+                  type="button"
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="min-w-0">
+                      <span
+                        className={cn(
+                          "vendor-workspace-label inline-flex min-w-0 max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-bold leading-5",
+                          isFireShop ? undefined : "bg-white/10 text-purple-100",
+                        )}
+                      >
+                        {panelLabel}
+                      </span>
+                      <span className="vendor-title mt-1.5 block truncate text-[15px] font-extrabold leading-tight">
                         {panelTitle}
                       </span>
-                      <span className="vendor-muted block truncate text-[10px] font-medium leading-[14px]">
-                        {panelSubtitle}
-                      </span>
                     </span>
-                    <span className="vendor-workspace-check inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full">
-                      <CheckIcon />
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "vendor-workspace-cue inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-transform duration-200",
+                        isWorkspaceMenuOpen ? "rotate-180" : undefined,
+                      )}
+                    >
+                      <ChevronDownIcon />
                     </span>
-                  </button>
+                  </span>
+                </button>
 
-                  {workspaceDisabledActionLabel ? (
-                    <div className="vendor-workspace-row vendor-workspace-row-disabled flex items-center gap-1.5 rounded-md px-1.5 py-1">
+                <div
+                  aria-hidden={!isWorkspaceMenuOpen}
+                  className={cn(
+                    "vendor-workspace-panel absolute left-0 right-0 top-[calc(100%+5px)] z-30 origin-top rounded-md border p-1 transition-all duration-150 ease-out",
+                    isWorkspaceMenuOpen
+                      ? "translate-y-0 scale-100 opacity-100"
+                      : "pointer-events-none -translate-y-1 scale-[0.98] opacity-0",
+                  )}
+                  id={workspacePanelId}
+                >
+                  <div className="flex items-center justify-between gap-2 px-1.5 pb-0.5">
+                    <p className="vendor-panel-title text-[10px] font-extrabold">
+                      {workspaceSelectorTitle}
+                    </p>
+                    <button
+                      aria-label="Close workspace selector"
+                      className="vendor-workspace-close inline-flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-bold"
+                      onClick={() => setIsWorkspaceMenuOpen(false)}
+                      tabIndex={isWorkspaceMenuOpen ? 0 : -1}
+                      type="button"
+                    >
+                      x
+                    </button>
+                  </div>
+                  <div className="space-y-0.5">
+                    <button
+                      className="vendor-workspace-row vendor-workspace-row-selected flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left"
+                      onClick={() => setIsWorkspaceMenuOpen(false)}
+                      tabIndex={isWorkspaceMenuOpen ? 0 : -1}
+                      type="button"
+                    >
                       <span className="vendor-workspace-mark inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
-                        <PlusIcon />
+                        <WorkspaceFlameIcon />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[11px] font-bold leading-4">
-                          {workspaceDisabledActionLabel}
+                        <span className="vendor-title block truncate text-[12px] font-bold leading-4">
+                          {panelTitle}
                         </span>
-                        <span className="block truncate text-[10px] font-medium leading-[14px]">
-                          Future workspace
+                        <span className="vendor-muted block truncate text-[10px] font-medium leading-[14px]">
+                          {panelSubtitle}
                         </span>
                       </span>
-                      <span className="vendor-workspace-soon shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold">
-                        Soon
+                      <span className="vendor-workspace-check inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full">
+                        <CheckIcon />
                       </span>
-                    </div>
-                  ) : null}
+                    </button>
+
+                    {workspaceDisabledActionLabel ? (
+                      <div className="vendor-workspace-row vendor-workspace-row-disabled flex items-center gap-1.5 rounded-md px-1.5 py-1">
+                        <span className="vendor-workspace-mark inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
+                          <PlusIcon />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[11px] font-bold leading-4">
+                            {workspaceDisabledActionLabel}
+                          </span>
+                          <span className="block truncate text-[10px] font-medium leading-[14px]">
+                            Future workspace
+                          </span>
+                        </span>
+                        <span className="vendor-workspace-soon shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold">
+                          Soon
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="vendor-sidebar-scroll mt-2.5 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-1">
               <nav className="space-y-1">
@@ -287,6 +348,50 @@ export function BackofficeFrame({
                     (item.href !== "/admin" &&
                       item.href !== "/vendor" &&
                       pathname.startsWith(`${item.href}/`));
+
+                  if (isSidebarCollapsed) {
+                    return item.disabled ? (
+                      <div
+                        className={cn(
+                          "flex h-[42px] cursor-not-allowed items-center justify-center rounded-lg",
+                          isFireShop ? "vendor-nav-link vendor-nav-link-disabled" : "text-purple-200/70",
+                        )}
+                        key={item.href}
+                        title={item.label}
+                      >
+                        <span className="vendor-nav-icon inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
+                          <SidebarIcon label={item.label} />
+                        </span>
+                      </div>
+                    ) : (
+                      <Link
+                        className={cn(
+                          "flex h-[42px] items-center justify-center rounded-lg transition-colors",
+                          isFireShop
+                            ? isActive
+                              ? "vendor-nav-link vendor-nav-link-active"
+                              : "vendor-nav-link"
+                            : isActive
+                              ? "bg-white text-[#4b1d7a] hover:bg-white hover:text-[#4b1d7a]"
+                              : "text-purple-50 hover:bg-[#6d35a8] hover:text-white",
+                        )}
+                        href={item.href}
+                        key={item.href}
+                        title={item.label}
+                      >
+                        <span
+                          className={cn(
+                            "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                            isFireShop ? "vendor-nav-icon" : isActive
+                              ? "bg-[#FFF4EB] text-[#FF6A2D]"
+                              : "bg-white/10 text-white/85",
+                          )}
+                        >
+                          <SidebarIcon label={item.label} />
+                        </span>
+                      </Link>
+                    );
+                  }
 
                   return item.disabled ? (
                     <div
@@ -362,30 +467,47 @@ export function BackofficeFrame({
                 })}
               </nav>
 
-              <div
+              {!isSidebarCollapsed && showSupportCard ? (
+                <div
+                  className={cn(
+                    "mt-3 rounded-lg p-2.5 text-[11px] leading-5",
+                    isFireShop
+                      ? "vendor-help-card"
+                      : "bg-black/20 text-purple-50",
+                  )}
+                >
+                  <p className="vendor-title text-[13px] font-bold">Need help?</p>
+                  <p className="mt-0.5">{supportText}</p>
+                  {isFireShop ? (
+                    <div className="mt-2.5 flex items-center gap-1.5">
+                      <span className="vendor-soft-pill inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold">
+                        YouTube
+                      </span>
+                      <span className="vendor-soft-pill inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold">
+                        WhatsApp
+                      </span>
+                      <span className="vendor-soft-pill inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold">
+                        Meta
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <button
+                aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 className={cn(
-                  "mt-3 rounded-lg p-2.5 text-[11px] leading-5",
+                  "mt-auto flex h-8 w-full items-center rounded-lg transition-colors",
+                  isSidebarCollapsed ? "justify-center" : "justify-end px-2",
                   isFireShop
-                    ? "vendor-help-card"
-                    : "bg-black/20 text-purple-50",
+                    ? "vendor-nav-link opacity-60 hover:opacity-100"
+                    : "text-purple-200/60 hover:bg-white/10 hover:text-white",
                 )}
+                onClick={toggleSidebar}
+                type="button"
               >
-                <p className="vendor-title text-[13px] font-bold">Need help?</p>
-                <p className="mt-0.5">{supportText}</p>
-                {isFireShop ? (
-                  <div className="mt-2.5 flex items-center gap-1.5">
-                    <span className="vendor-soft-pill inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold">
-                      YouTube
-                    </span>
-                    <span className="vendor-soft-pill inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold">
-                      WhatsApp
-                    </span>
-                    <span className="vendor-soft-pill inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold">
-                      Meta
-                    </span>
-                  </div>
-                ) : null}
-              </div>
+                {isSidebarCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+              </button>
             </div>
           </div>
         </aside>
@@ -424,7 +546,7 @@ export function BackofficeFrame({
                 {isFireShop ? (
                   <button
                     aria-checked={vendorTheme === "dark"}
-                    aria-label={`Switch to ${vendorTheme === "dark" ? "light" : "dark"} mode`}
+                    aria-label={vendorTheme === "dark" ? themeAriaLight : themeAriaDark}
                     className="vendor-theme-toggle"
                     onClick={toggleVendorTheme}
                     role="switch"
@@ -434,7 +556,7 @@ export function BackofficeFrame({
                       {vendorTheme === "dark" ? <MoonIcon /> : <SunIcon />}
                     </span>
                     <span className="text-xs font-bold">
-                      {vendorTheme === "dark" ? "Dark" : "Light"}
+                      {vendorTheme === "dark" ? themeDarkLabel : themeLightLabel}
                     </span>
                   </button>
                 ) : null}
@@ -463,7 +585,7 @@ export function BackofficeFrame({
                       >
                         <div className="border-b pb-3">
                           <p className="vendor-muted text-xs font-semibold uppercase tracking-wide">
-                            Vendor account
+                            {accountMenuTitle}
                           </p>
                           <p className="vendor-title mt-1 truncate text-sm font-bold">
                             {panelTitle}
@@ -475,7 +597,7 @@ export function BackofficeFrame({
                           ) : null}
                           {user?.fullName ? (
                             <p className="vendor-muted mt-2 truncate text-xs">
-                              Signed in as {user.fullName}
+                              {signedInAsLabel} {user.fullName}
                             </p>
                           ) : null}
                         </div>
@@ -486,7 +608,7 @@ export function BackofficeFrame({
                           role="menuitem"
                           type="button"
                         >
-                          {isLoggingOut ? "Logging out" : "Logout"}
+                          {isLoggingOut ? loggingOutLabel : logoutLabel}
                         </button>
                       </div>
                     ) : null}
@@ -518,7 +640,7 @@ function SidebarIcon({ label }: { label: string }) {
   const normalized = label.toLowerCase();
   const iconClassName = "h-4 w-4";
 
-  if (normalized.includes("dashboard")) {
+  if (normalized.includes("dashboard") || normalized.includes("tableau")) {
     return (
       <svg aria-hidden="true" className={iconClassName} fill="none" viewBox="0 0 24 24">
         <path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z" fill="currentColor" />
@@ -526,7 +648,7 @@ function SidebarIcon({ label }: { label: string }) {
     );
   }
 
-  if (normalized.includes("order")) {
+  if (normalized.includes("order") || normalized.includes("commande")) {
     return (
       <svg aria-hidden="true" className={iconClassName} fill="none" viewBox="0 0 24 24">
         <path d="M4 7h16M7 12h10M9 17h6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
@@ -534,7 +656,7 @@ function SidebarIcon({ label }: { label: string }) {
     );
   }
 
-  if (normalized.includes("product")) {
+  if (normalized.includes("product") || normalized.includes("produit")) {
     return (
       <svg aria-hidden="true" className={iconClassName} fill="none" viewBox="0 0 24 24">
         <path
@@ -548,7 +670,12 @@ function SidebarIcon({ label }: { label: string }) {
     );
   }
 
-  if (normalized.includes("setting") || normalized.includes("categorie")) {
+  if (
+    normalized.includes("setting") ||
+    normalized.includes("categorie") ||
+    normalized.includes("paramètre") ||
+    normalized.includes("boutique")
+  ) {
     return (
       <svg aria-hidden="true" className={iconClassName} fill="none" viewBox="0 0 24 24">
         <path
@@ -611,6 +738,34 @@ function ChevronDownIcon() {
   );
 }
 
+function ChevronLeftIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path
+        d="m15 18-6-6 6-6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path
+        d="m9 18 6-6-6-6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
 function CheckIcon() {
   return (
     <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
@@ -654,4 +809,3 @@ function WorkspaceFlameIcon() {
     </svg>
   );
 }
-

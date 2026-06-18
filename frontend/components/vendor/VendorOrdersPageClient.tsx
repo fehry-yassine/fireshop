@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { ApiError, api } from "@/lib/api";
 import { formatTnd } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Order, OrderStatus, Product, VendorOrderUpsertPayload } from "@/types";
+import type { Order, OrderStatus, VendorOrderUpsertPayload } from "@/types";
 
 type StatusMessage = {
   orderId?: string;
@@ -28,8 +28,6 @@ type StatusMessage = {
 type DrawerState = {
   mode: "edit" | "view";
   orderId: string;
-} | {
-  mode: "create";
 } | null;
 
 type OrderFormState = {
@@ -40,14 +38,12 @@ type OrderFormState = {
   notes: string;
   phone: string;
   postalCode: string;
-  productId: string;
-  quantity: string;
   status: OrderStatus;
 };
 
 const TAB_ITEMS = [
-  { label: "Orders", value: "orders" },
-  { label: "Deleted", value: "deleted" },
+  { label: "Commandes", value: "orders" },
+  { label: "Supprimées", value: "deleted" },
 ] as const;
 
 type OrdersTab = (typeof TAB_ITEMS)[number]["value"];
@@ -66,12 +62,11 @@ export function VendorOrdersPageClient() {
 
 function VendorOrdersContent() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [message, setMessage] = useState<StatusMessage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [drawerState, setDrawerState] = useState<DrawerState>(null);
-  const [orderForm, setOrderForm] = useState<OrderFormState>(buildCreateOrderForm());
+  const [orderForm, setOrderForm] = useState<OrderFormState>(buildEmptyOrderForm());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "ALL">("ALL");
   const [activeTab, setActiveTab] = useState<OrdersTab>("orders");
@@ -84,28 +79,19 @@ function VendorOrdersContent() {
       setMessage(null);
 
       try {
-        const [orderResponse, productResponse] = await Promise.all([
-          api.vendors.orders({
-            deleted: activeTab === "deleted",
-            search: search.trim() || undefined,
-            status: statusFilter === "ALL" ? undefined : statusFilter,
-          }),
-          api.vendors.products.list(),
-        ]);
+        const orderResponse = await api.vendors.orders({
+          deleted: activeTab === "deleted",
+          search: search.trim() || undefined,
+          status: statusFilter === "ALL" ? undefined : statusFilter,
+        });
 
         if (isActive) {
           applyOrders(orderResponse);
-          setProducts(productResponse);
-          setOrderForm((current) =>
-            current.productId || productResponse.length === 0
-              ? current
-              : { ...current, productId: productResponse[0].id },
-          );
         }
       } catch (error) {
         if (isActive) {
           setMessage({
-            text: error instanceof Error ? error.message : "Could not load vendor data.",
+            text: error instanceof Error ? error.message : "Impossible de charger les commandes.",
             tone: "error",
           });
         }
@@ -154,14 +140,6 @@ function VendorOrdersContent() {
     setOrders(nextOrders);
   }
 
-  function openCreateDrawer() {
-    setOrderForm(
-      buildCreateOrderForm(products[0]),
-    );
-    setMessage(null);
-    setDrawerState({ mode: "create" });
-  }
-
   function openEditDrawer(order: Order) {
     setOrderForm(buildEditOrderForm(order));
     setMessage(null);
@@ -175,7 +153,7 @@ function VendorOrdersContent() {
   }
 
   async function handleSaveOrder() {
-    if (!drawerState) {
+    if (!drawerState || !selectedOrder) {
       return;
     }
 
@@ -183,29 +161,11 @@ function VendorOrdersContent() {
     const trimmedPhone = orderForm.phone.trim();
     const trimmedAddress = orderForm.address.trim();
     const trimmedCity = orderForm.city.trim();
-    const quantity = Number(orderForm.quantity);
-    const isCreate = drawerState.mode === "create";
 
     if (!trimmedFullName || !trimmedPhone || !trimmedAddress || !trimmedCity) {
       setMessage({
         orderId: selectedOrder?.id,
-        text: "Name, phone, address, and city are required.",
-        tone: "error",
-      });
-      return;
-    }
-
-    if (isCreate && !orderForm.productId) {
-      setMessage({
-        text: "Please select a product for the new order.",
-        tone: "error",
-      });
-      return;
-    }
-
-    if (isCreate && (!Number.isInteger(quantity) || quantity <= 0)) {
-      setMessage({
-        text: "Quantity must be a positive number.",
+        text: "Le nom, le téléphone, l'adresse et la ville sont obligatoires.",
         tone: "error",
       });
       return;
@@ -222,30 +182,11 @@ function VendorOrdersContent() {
       notes: orderForm.notes.trim() || undefined,
     };
 
-    if (isCreate) {
-      payload.productId = orderForm.productId;
-      payload.quantity = quantity;
-    }
-
-    const saveKey = isCreate ? "__create__" : selectedOrder?.id ?? "__edit__";
-    setActiveOrderId(saveKey);
+    setActiveOrderId(selectedOrder.id);
     setMessage(null);
 
     try {
-      const response = isCreate
-        ? await api.vendors.createOrder(payload)
-        : await api.vendors.updateOrder(selectedOrder!.id, payload);
-
-      if (isCreate) {
-        setActiveTab("orders");
-        setOrders((current) => [response.order, ...current]);
-        setDrawerState(null);
-        setMessage({
-          text: `Order ${shortOrderId(response.order.id)} created successfully.`,
-          tone: "success",
-        });
-        return;
-      }
+      const response = await api.vendors.updateOrder(selectedOrder.id, payload);
 
       setOrders((current) =>
         current.map((item) => (item.id === response.order.id ? response.order : item)),
@@ -253,7 +194,7 @@ function VendorOrdersContent() {
       setOrderForm(buildEditOrderForm(response.order));
       setMessage({
         orderId: response.order.id,
-        text: "Order updated successfully.",
+        text: "Commande mise à jour avec succès.",
         tone: "success",
       });
     } catch (error) {
@@ -278,7 +219,7 @@ function VendorOrdersContent() {
         current && "orderId" in current && current.orderId === order.id ? null : current,
       );
       setMessage({
-        text: `Order ${shortOrderId(order.id)} moved to Deleted.`,
+        text: `Commande ${shortOrderId(order.id)} déplacée vers Supprimées.`,
         tone: "success",
       });
     } catch (error) {
@@ -298,15 +239,8 @@ function VendorOrdersContent() {
     setStatusFilter("ALL");
   }
 
-  function showUnavailableMessage(text: string) {
-    setMessage({
-      text,
-      tone: "error",
-    });
-  }
-
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="inline-flex w-full overflow-x-auto rounded-xl bg-slate-200/70 p-1.5 lg:w-auto">
           {TAB_ITEMS.map((tab) => (
@@ -326,14 +260,6 @@ function VendorOrdersContent() {
           ))}
         </div>
 
-        <div className="flex justify-start lg:justify-end">
-          <Button
-            className="vendor-primary-action h-12 rounded-xl px-5"
-            onClick={openCreateDrawer}
-          >
-            <span>+ Add order</span>
-          </Button>
-        </div>
       </div>
 
       {message && !message.orderId ? (
@@ -353,11 +279,11 @@ function VendorOrdersContent() {
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
             <label className="relative w-full md:w-[260px]">
-              <span className="sr-only">Search orders</span>
+              <span className="sr-only">Rechercher une commande</span>
               <input
                 className="h-12 w-full rounded-lg border border-slate-200 bg-white px-5 pr-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/15"
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search..."
+                placeholder="Rechercher..."
                 type="search"
                 value={search}
               />
@@ -371,25 +297,9 @@ function VendorOrdersContent() {
               value={statusFilter}
             />
 
-            <button
-              className="inline-flex h-12 w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:bg-slate-50 md:w-auto"
-              onClick={() => showUnavailableMessage("Date range filtering needs API support before it can be saved as a real filter.")}
-              type="button"
-            >
-              <CalendarIcon className="h-5 w-5" />
-              Pick a date range
-            </button>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <button
-              className="inline-flex h-12 items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 transition hover:bg-slate-50"
-              onClick={() => showUnavailableMessage("Advanced filters are UI-only until backend filters are added.")}
-              type="button"
-            >
-              <SlidersIcon className="h-4 w-4" />
-              Advanced Filter
-            </button>
             <button
               className="inline-flex h-12 items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 transition hover:bg-slate-50"
               onClick={clearFilters}
@@ -408,7 +318,7 @@ function VendorOrdersContent() {
                   )}
                 />
               </span>
-              All orders
+              Toutes les commandes
             </button>
           </div>
         </div>
@@ -417,30 +327,23 @@ function VendorOrdersContent() {
           <table className="w-full min-w-[1120px] border-collapse text-sm text-slate-900">
             <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="w-12 px-3 py-4 text-left">
-                  <input
-                    aria-label="Select all orders"
-                    className="h-5 w-5 rounded border-slate-300 text-orange-600"
-                    type="checkbox"
-                  />
-                </th>
                 <th className="px-3 py-4 text-left">ID</th>
-                <th className="px-3 py-4 text-left">Products</th>
-                <th className="px-3 py-4 text-left">Customer</th>
+                <th className="px-3 py-4 text-left">Produits</th>
+                <th className="px-3 py-4 text-left">Client</th>
                 <th className="px-3 py-4 text-left">Date</th>
-                <th className="px-3 py-4 text-left">Delivery</th>
-                <th className="px-3 py-4 text-left">Status</th>
+                <th className="px-3 py-4 text-left">Livraison</th>
+                <th className="px-3 py-4 text-left">Statut</th>
                 <th className="px-3 py-4 text-left">Total</th>
                 <th className="px-3 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <TableMessage colSpan={9} text="Loading received orders." />
+                <TableMessage colSpan={8} text="Chargement des commandes." />
               ) : orders.length === 0 ? (
-                <TableMessage colSpan={9} text="Buyer COD orders for your store will appear here when checkout is complete." />
+                <TableMessage colSpan={8} text="Vos commandes COD apparaîtront ici dès que les acheteurs commanderont vos produits approuvés." />
               ) : filteredOrders.length === 0 ? (
-                <TableMessage colSpan={9} text="No orders match the current filters." />
+                <TableMessage colSpan={8} text="Aucune commande ne correspond aux filtres actuels." />
               ) : (
                 filteredOrders.map((order) => (
                   <OrderTableRow
@@ -457,36 +360,6 @@ function VendorOrdersContent() {
           </table>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 text-sm text-slate-900 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <span>Rows per page:</span>
-            <button className="inline-flex items-center gap-1 font-semibold" type="button">
-              100
-              <ChevronDownIcon className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="inline-flex overflow-hidden rounded-lg border border-slate-200">
-            <button
-              aria-label="Previous page"
-              className="inline-flex h-11 w-14 items-center justify-center bg-white text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-              disabled
-              type="button"
-            >
-              <ArrowLeftIcon className="h-5 w-5" />
-            </button>
-            <span className="inline-flex h-11 w-12 items-center justify-center border-x border-slate-200 bg-slate-50 font-bold">
-              1
-            </span>
-            <button
-              aria-label="Next page"
-              className="inline-flex h-11 w-14 items-center justify-center bg-white text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-              disabled
-              type="button"
-            >
-              <ArrowRightIcon className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
       </section>
 
       {drawerState ? (
@@ -494,18 +367,15 @@ function VendorOrdersContent() {
           activeOrderId={activeOrderId}
           form={orderForm}
           message={
-            drawerState.mode === "create"
+            message?.orderId && selectedOrder && message.orderId === selectedOrder.id
               ? message
-              : message?.orderId && selectedOrder && message.orderId === selectedOrder.id
-                ? message
-                : null
+              : null
           }
           mode={drawerState.mode}
           onClose={() => setDrawerState(null)}
           onFormChange={setOrderForm}
           onSave={handleSaveOrder}
           order={selectedOrder}
-          products={products}
         />
       ) : null}
     </div>
@@ -530,13 +400,6 @@ function OrderTableRow({
 
   return (
     <tr className="h-[66px] border-t border-slate-200 align-middle transition-colors hover:bg-slate-50/70">
-      <td className="px-3 py-3">
-        <input
-          aria-label={`Select order ${shortOrderId(order.id)}`}
-          className="h-5 w-5 rounded border-slate-300 text-orange-600"
-          type="checkbox"
-        />
-      </td>
       <td className="px-3 py-3 font-semibold text-slate-900">{shortNumericId(order.id)}</td>
       <td className="px-3 py-3">
         <div className="flex min-w-[150px] items-center gap-3">
@@ -546,7 +409,7 @@ function OrderTableRow({
           />
           <div className="min-w-0">
             <p className="truncate font-semibold text-slate-900">
-              {firstItem?.productName ?? "Order item"}
+              {firstItem?.productName ?? "Article"}
             </p>
             <p className="text-sm text-slate-500">x{itemCount}</p>
           </div>
@@ -565,15 +428,15 @@ function OrderTableRow({
       <td className="px-3 py-3 font-semibold text-slate-900">{formatTnd(order.total)}</td>
       <td className="px-3 py-3">
         <div className="flex justify-end gap-2">
-          <ActionButton label={`View ${shortOrderId(order.id)}`} onClick={onView}>
+          <ActionButton label={`Voir ${shortOrderId(order.id)}`} onClick={onView}>
             <EyeIcon className="h-4 w-4" />
           </ActionButton>
           {!isDeletedView ? (
             <>
-              <ActionButton label={`Edit ${shortOrderId(order.id)}`} onClick={onEdit}>
+              <ActionButton label={`Modifier ${shortOrderId(order.id)}`} onClick={onEdit}>
                 <EditIcon className="h-4 w-4" />
               </ActionButton>
-              <ActionButton label={`Delete ${shortOrderId(order.id)}`} onClick={onArchive}>
+              <ActionButton label={`Supprimer ${shortOrderId(order.id)}`} onClick={onArchive}>
                 <TrashIcon className="h-4 w-4" />
               </ActionButton>
             </>
@@ -593,43 +456,31 @@ function OrderDrawer({
   onFormChange,
   onSave,
   order,
-  products,
 }: {
   activeOrderId: string | null;
   form: OrderFormState;
   message: StatusMessage | null;
-  mode: "create" | "edit" | "view";
+  mode: "edit" | "view";
   onClose: () => void;
   onFormChange: Dispatch<SetStateAction<OrderFormState>>;
   onSave: () => void;
   order: Order | null;
-  products: Product[];
 }) {
-  const isCreateMode = mode === "create";
   const isEditableMode = mode !== "view";
-  const isSaving = activeOrderId === (isCreateMode ? "__create__" : order?.id ?? "__edit__");
-  const itemCount = order ? getOrderItemCount(order) : Number(form.quantity || 0);
-  const selectedProduct = products.find((product) => product.id === form.productId) ?? null;
-  const estimatedTotal = selectedProduct
-    ? Number(form.quantity || 0) * Number(selectedProduct.offerPrice ?? selectedProduct.price)
-    : 0;
+  const isSaving = activeOrderId === (order?.id ?? "__edit__");
   const orderShortId = order ? shortOrderId(order.id) : "--";
   const orderNumericId = order ? shortNumericId(order.id) : "--";
   const statusChanged = order ? form.status !== order.status : true;
-  const drawerEyebrow = isCreateMode
-    ? "Order creator"
-    : isEditableMode
-      ? "Order editor"
-      : "Order management";
-  const drawerTitle = isCreateMode
-    ? "Add new order"
-    : isEditableMode
-      ? `Edit order No.${orderNumericId}`
-      : `Order ${orderShortId}`;
+  const drawerEyebrow = isEditableMode ? "Éditeur de commande" : "Gestion de commande";
+  const drawerTitle = isEditableMode
+    ? `Modifier la commande N°${orderNumericId}`
+    : `Commande ${orderShortId}`;
 
-  if (!isCreateMode && !order) {
+  if (!order) {
     return null;
   }
+
+  const itemCount = getOrderItemCount(order);
 
   function updateFormField<K extends keyof OrderFormState>(field: K, value: OrderFormState[K]) {
     onFormChange((current) => ({ ...current, [field]: value }));
@@ -637,7 +488,7 @@ function OrderDrawer({
 
   return (
     <DashboardDrawer
-      description="Manage customer details, order status, notes, and fulfillment context."
+      description="Gérez les informations client, le statut de la commande, les notes et le suivi."
       eyebrow={drawerEyebrow}
       footer={
         isEditableMode ? (
@@ -648,7 +499,7 @@ function OrderDrawer({
               onClick={onClose}
               variant="secondary"
             >
-              Cancel
+              Annuler
             </Button>
             <Button
               className="vendor-primary-action h-11 rounded-xl px-5"
@@ -656,7 +507,7 @@ function OrderDrawer({
               onClick={onSave}
             >
               <SaveIcon className="h-4 w-4" />
-              {isSaving ? "Saving" : isCreateMode ? "Create order" : "Save"}
+              {isSaving ? "Enregistrement" : "Enregistrer"}
             </Button>
           </div>
         ) : null
@@ -682,91 +533,66 @@ function OrderDrawer({
 
         {isEditableMode ? (
           <div className="space-y-5">
-            <DrawerSection
-              action={
-                <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <input className="h-5 w-5 rounded border-slate-300" disabled type="checkbox" />
-                  Exchange
-                </label>
-              }
-              title="Order Details"
-            >
-              <div className="grid gap-4 lg:grid-cols-2">
-                <Field label="Status">
+            <DrawerSection title="Détails de la commande">
+              <div className="grid gap-4">
+                <Field label="Statut">
                   <StatusPicker
                     flowStatus={order?.status}
                     onChange={(value) => updateFormField("status", value as OrderStatus)}
-                    restrictToFlow={!isCreateMode}
+                    restrictToFlow
                     value={form.status}
                   />
                   <StatusGuidance status={form.status} />
                 </Field>
-                <Field label="Delivery Company">
-                  <select className={inputClassName} disabled value="-">
-                    <option>-</option>
-                  </select>
-                </Field>
               </div>
-              <Field label="Add a private note">
+              <Field label="Ajouter une note privée">
                 <textarea
                   className={`${textareaClassName} h-20`}
-                  placeholder="Add a private note"
+                  placeholder="Ajouter une note privée"
                   onChange={(event) => updateFormField("notes", event.target.value)}
                   value={form.notes}
                 />
               </Field>
             </DrawerSection>
 
-            <DrawerSection
-              action={
-                <button
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900"
-                  disabled
-                  type="button"
-                >
-                  <BanIcon className="h-4 w-4" />
-                  Customer Spam Check
-                </button>
-              }
-              title="Customer Details"
-            >
+            <DrawerSection title="Informations client">
               <div className="grid gap-4 lg:grid-cols-2">
-                <Field label="Name">
+                <Field label="Nom">
                   <input
                     className={inputClassName}
                     onChange={(event) => updateFormField("fullName", event.target.value)}
                     value={form.fullName}
                   />
                 </Field>
-                <Field label="Phone">
+                <Field label="Téléphone">
                   <input
                     className={inputClassName}
                     onChange={(event) => updateFormField("phone", event.target.value)}
                     value={form.phone}
                   />
                 </Field>
-                <Field label="Address">
+                <Field label="Adresse">
                   <input
                     className={inputClassName}
                     onChange={(event) => updateFormField("address", event.target.value)}
                     value={form.address}
                   />
                 </Field>
-                <Field label="City">
+                <Field label="Ville">
                   <input
                     className={inputClassName}
                     onChange={(event) => updateFormField("city", event.target.value)}
                     value={form.city}
                   />
                 </Field>
-                <Field label="Governorate">
+                <Field label="Gouvernorat">
                   <input
                     className={inputClassName}
                     onChange={(event) => updateFormField("governorate", event.target.value)}
                     value={form.governorate}
                   />
                 </Field>
-                <Field label="Postal code">
+                <Field label="Code postal">
                   <input
                     className={inputClassName}
                     onChange={(event) => updateFormField("postalCode", event.target.value)}
@@ -777,56 +603,14 @@ function OrderDrawer({
               <Field label="Note">
                 <textarea
                   className={`${textareaClassName} h-20`}
-                  placeholder="Enter any additional notes"
+                  placeholder="Saisissez des notes complémentaires"
                   onChange={(event) => updateFormField("notes", event.target.value)}
                   value={form.notes}
                 />
               </Field>
             </DrawerSection>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Field label="Select a product">
-                <select
-                  className={inputClassName}
-                  disabled={!isCreateMode}
-                  onChange={(event) => updateFormField("productId", event.target.value)}
-                  value={form.productId}
-                >
-                  <option value="">Choose product</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Quantity">
-                <input
-                  className={inputClassName}
-                  disabled={!isCreateMode}
-                  inputMode="numeric"
-                  min={1}
-                  onChange={(event) => updateFormField("quantity", event.target.value)}
-                  type="number"
-                  value={form.quantity}
-                />
-              </Field>
-            </div>
-
-            {order ? (
-              <OrderSummarySection order={order} />
-            ) : (
-              <DrawerSection title="Order Summary">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <DetailRow label="Product" value={selectedProduct?.name ?? "-"} />
-                  <DetailRow label="Quantity" value={form.quantity || "0"} />
-                </div>
-                <div className="mt-4 flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3">
-                  <span className="font-bold text-orange-700">Estimated total</span>
-                  <span className="font-bold text-slate-950">{formatTnd(estimatedTotal)}</span>
-                </div>
-              </DrawerSection>
-            )}
+            <OrderSummarySection order={order} />
           </div>
         ) : (
           <div className="space-y-5">
@@ -853,7 +637,7 @@ function OrderDrawer({
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
               <div className="space-y-5">
-                <DrawerSection title="Order items">
+                <DrawerSection title="Articles de la commande">
                   <div className="divide-y divide-slate-200">
                     {order!.items.map((item) => (
                       <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0" key={item.id}>
@@ -870,7 +654,7 @@ function OrderDrawer({
                               {item.productName}
                             </Link>
                             <p className="text-xs text-slate-500">
-                              Qty {item.quantity} / {formatTnd(item.unitPrice)}
+                              Qté {item.quantity} / {formatTnd(item.unitPrice)}
                             </p>
                           </div>
                         </div>
@@ -880,9 +664,9 @@ function OrderDrawer({
                   </div>
                 </DrawerSection>
 
-                <DrawerSection title="Update status">
+                <DrawerSection title="Mettre à jour le statut">
                   <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                    <Field label="Status">
+                    <Field label="Statut">
                       <StatusPicker
                         flowStatus={order!.status}
                         onChange={(value) => updateFormField("status", value as OrderStatus)}
@@ -896,28 +680,28 @@ function OrderDrawer({
                       disabled={isSaving || !statusChanged}
                       onClick={onSave}
                     >
-                      {isSaving ? "Saving" : "Save status"}
+                      {isSaving ? "Enregistrement" : "Enregistrer le statut"}
                     </Button>
                   </div>
                 </DrawerSection>
               </div>
 
               <div className="space-y-5">
-                <DrawerSection title="Customer details">
-                  <DetailRow label="Name" value={order!.shipping.fullName} />
-                  <DetailRow label="Phone" value={order!.shipping.phone} />
-                  <DetailRow label="City" value={order!.shipping.city} />
-                  <DetailRow label="Email" value={order!.buyer?.email ?? "-"} />
+                <DrawerSection title="Informations client">
+                  <DetailRow label="Nom" value={order!.shipping.fullName} />
+                  <DetailRow label="Téléphone" value={order!.shipping.phone} />
+                  <DetailRow label="Ville" value={order!.shipping.city} />
+                  <DetailRow label="E-mail" value={order!.buyer?.email ?? "-"} />
                 </DrawerSection>
 
-                <DrawerSection title="Delivery address">
+                <DrawerSection title="Adresse de livraison">
                   <p className="text-sm leading-6 text-slate-700">{formatAddress(order!)}</p>
                 </DrawerSection>
 
-                <DrawerSection title="Summary">
-                  <DetailRow label="Subtotal" value={formatTnd(order!.subtotal)} />
-                  <DetailRow label="Delivery" value={formatTnd(order!.deliveryFee)} />
-                  <DetailRow label="Items" value={`${itemCount}`} />
+                <DrawerSection title="Récapitulatif">
+                  <DetailRow label="Sous-total" value={formatTnd(order!.subtotal)} />
+                  <DetailRow label="Livraison" value={formatTnd(order!.deliveryFee)} />
+                  <DetailRow label="Articles" value={`${itemCount}`} />
                   <div className="mt-4 flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3">
                     <span className="font-bold text-orange-700">Total</span>
                     <span className="font-extrabold text-slate-950">{formatTnd(order!.total)}</span>
@@ -954,18 +738,15 @@ function DrawerSection({
 
 function OrderSummarySection({ order }: { order: Order }) {
   return (
-    <DrawerSection title="Orders Summary">
+    <DrawerSection title="Récapitulatif de la commande">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[780px] text-sm">
+        <table className="w-full min-w-[520px] text-sm">
           <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-3 py-3 text-left">Product</th>
-              <th className="px-3 py-3 text-left">ID</th>
-              <th className="px-3 py-3 text-left">Quantity</th>
-              <th className="px-3 py-3 text-left">Attributes</th>
-              <th className="px-3 py-3 text-left">Unit Price</th>
-              <th className="px-3 py-3 text-left">Total</th>
-              <th className="px-3 py-3 text-right">Action</th>
+              <th className="px-3 py-3 text-left">Produit</th>
+              <th className="px-3 py-3 text-left">Quantité</th>
+              <th className="px-3 py-3 text-left">Prix unitaire</th>
+              <th className="px-3 py-3 text-right">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -981,53 +762,30 @@ function OrderSummarySection({ order }: { order: Order }) {
                     <span className="font-semibold text-slate-900">{item.productName}</span>
                   </div>
                 </td>
-                <td className="px-3 py-4 text-slate-700">{shortNumericId(item.productId)}</td>
-                <td className="px-3 py-4">
-                  <input className="h-10 w-24 rounded-lg border border-slate-200 px-3 text-sm" readOnly value={item.quantity} />
-                </td>
-                <td className="px-3 py-4 text-slate-500">-</td>
-                <td className="px-3 py-4">
-                  <input className="h-10 w-28 rounded-lg border border-slate-200 px-3 text-sm" readOnly value={Number(item.unitPrice)} />
-                </td>
-                <td className="px-3 py-4 font-semibold text-slate-900">{formatTnd(item.subtotal)}</td>
-                <td className="px-3 py-4 text-right">
-                  <button
-                    aria-label="Remove item"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-500"
-                    disabled
-                    type="button"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                </td>
+                <td className="px-3 py-4 text-slate-700">{item.quantity}</td>
+                <td className="px-3 py-4 text-slate-700">{formatTnd(item.unitPrice)}</td>
+                <td className="px-3 py-4 text-right font-semibold text-slate-900">{formatTnd(item.subtotal)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div className="mt-4 space-y-3 rounded-xl border border-slate-200 p-4">
-        <SummaryInput label="Delivery Cost" value={order.deliveryFee} />
-        <SummaryInput label="Delivery Price" value={order.deliveryFee} />
+      <div className="mt-4 space-y-2 rounded-xl border border-slate-200 p-4">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-500">Sous-total</span>
+          <span className="font-semibold text-slate-900">{formatTnd(order.subtotal)}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-500">Livraison</span>
+          <span className="font-semibold text-slate-900">{formatTnd(order.deliveryFee)}</span>
+        </div>
         <div className="flex items-center justify-between rounded-lg bg-orange-50 px-4 py-3">
           <span className="font-bold text-orange-700">Total</span>
           <span className="font-extrabold text-slate-950">{formatTnd(order.total)}</span>
         </div>
       </div>
     </DrawerSection>
-  );
-}
-
-function SummaryInput({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <label className="font-bold text-slate-900">{label}</label>
-      <input
-        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm sm:w-32"
-        readOnly
-        value={Number(value)}
-      />
-    </div>
   );
 }
 
@@ -1195,7 +953,7 @@ function StatusPicker({
         type="button"
       >
         {value === "ALL" ? (
-          <span className="text-slate-500">Status</span>
+          <span className="text-slate-500">Statut</span>
         ) : (
           <span className={cn("inline-flex rounded-full px-3 py-1 text-[13px] font-semibold", getStatusToneClass(value))}>
             {formatOrderStatus(value)}
@@ -1218,7 +976,7 @@ function StatusPicker({
               }}
               type="button"
             >
-              <span>Status</span>
+              <span>Statut</span>
               {value === "ALL" ? <CheckIcon className="h-4 w-4 text-slate-700" /> : null}
             </button>
           ) : null}
@@ -1264,7 +1022,7 @@ function isOrderStatus(value: OrderStatus | "ALL"): value is OrderStatus {
   return value !== "ALL";
 }
 
-function buildCreateOrderForm(defaultProduct?: Product): OrderFormState {
+function buildEmptyOrderForm(): OrderFormState {
   return {
     address: "",
     city: "",
@@ -1273,8 +1031,6 @@ function buildCreateOrderForm(defaultProduct?: Product): OrderFormState {
     notes: "",
     phone: "",
     postalCode: "",
-    productId: defaultProduct?.id ?? "",
-    quantity: "1",
     status: "PENDING",
   };
 }
@@ -1288,8 +1044,6 @@ function buildEditOrderForm(order: Order): OrderFormState {
     notes: order.notes ?? "",
     phone: order.shipping.phone ?? "",
     postalCode: order.shipping.postalCode ?? "",
-    productId: order.items[0]?.productId ?? "",
-    quantity: String(order.items[0]?.quantity ?? 1),
     status: order.status,
   };
 }
@@ -1303,7 +1057,7 @@ function getVendorOrderError(error: unknown) {
     return error.message;
   }
 
-  return "Could not save order changes.";
+  return "Impossible d'enregistrer les modifications de la commande.";
 }
 
 function getOrderItemCount(order: Order) {
@@ -1339,7 +1093,7 @@ function formatDateTime(value: string) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-TN", {
+  return new Intl.DateTimeFormat("fr-TN", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
@@ -1351,43 +1105,10 @@ const inputClassName =
 const textareaClassName =
   "w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/15";
 
-function ArrowLeftIcon({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
-      <path d="M19 12H5m6-6-6 6 6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function ArrowRightIcon({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
-      <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function BanIcon({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
-      <path d="m7 7 10 10" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-    </svg>
-  );
-}
-
 function BoxIcon({ className }: { className?: string }) {
   return (
     <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
       <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm0 0v18m8-13.5-8 4.5-8-4.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function CalendarIcon({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
-      <path d="M7 3v4m10-4v4M4 9h16M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
     </svg>
   );
 }
@@ -1446,14 +1167,6 @@ function SearchIcon({ className }: { className?: string }) {
   return (
     <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
       <path d="m21 21-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function SlidersIcon({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
-      <path d="M4 7h4m4 0h8M4 17h10m4 0h2M10 5v4m6 6v4" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
     </svg>
   );
 }
