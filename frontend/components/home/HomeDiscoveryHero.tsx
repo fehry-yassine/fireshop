@@ -60,7 +60,7 @@ const fallbackPromoCards: HomePromoCard[] = [
   {
     alt: "Nouveautes beaute FireShop",
     eyebrow: "Recherches frequentes",
-    href: "/categories/beauty",
+    href: "/categories/beauty-personal-care",
     id: "beauty-new",
     title: "Beaute & soins",
     visualType: "beauty",
@@ -224,7 +224,10 @@ export function HomeDiscoveryHero({
   return (
     <section className="space-y-6">
       <div className="grid gap-3 lg:min-h-[368px] lg:grid-cols-[292px_minmax(0,1fr)_470px] xl:grid-cols-[304px_minmax(0,1fr)_500px]">
-        <aside className="order-2 overflow-hidden rounded-lg bg-[#f7f7f7] lg:order-1 lg:h-[368px]">
+        <aside
+          className="order-2 overflow-hidden rounded-lg bg-[#f7f7f7] lg:order-1 lg:h-[368px]"
+          id="categories"
+        >
           <nav
             aria-label="Categories pour vous"
             className="overflow-x-auto p-2 lg:h-full lg:overflow-y-auto lg:overflow-x-hidden [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70 [&::-webkit-scrollbar-track]:bg-transparent"
@@ -254,8 +257,8 @@ export function HomeDiscoveryHero({
                       <span className="line-clamp-2 break-words" dir="auto">
                         {category.name}
                       </span>
-                      <span className="text-lg font-light text-slate-500 transition group-hover:text-market-700">
-                        {">"}
+                      <span className="text-slate-500 transition group-hover:text-market-700">
+                        <ChevronRightIcon />
                       </span>
                     </Link>
                   </li>
@@ -270,19 +273,19 @@ export function HomeDiscoveryHero({
             <>
               <button
                 aria-label="Promotions precedentes"
-                className="absolute left-2 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-white/95 text-2xl font-light text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.15)] transition hover:bg-white hover:text-market-900"
+                className="absolute left-2 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-white/95 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.15)] transition hover:bg-white hover:text-market-900"
                 onClick={() => browsePromos("previous")}
                 type="button"
               >
-                {"<"}
+                <ChevronLeftIcon />
               </button>
               <button
                 aria-label="Promotions suivantes"
-                className="absolute right-2 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-white/95 text-2xl font-light text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.15)] transition hover:bg-white hover:text-market-900"
+                className="absolute right-2 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-white/95 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.15)] transition hover:bg-white hover:text-market-900"
                 onClick={() => browsePromos("next")}
                 type="button"
               >
-                {">"}
+                <ChevronRightIcon />
               </button>
             </>
           ) : null}
@@ -322,19 +325,19 @@ export function HomeDiscoveryHero({
 
           <button
             aria-label="Banniere precedente"
-            className="absolute left-3 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/82 text-xl font-light text-slate-700 shadow-sm transition hover:bg-white hover:text-market-900"
+            className="absolute left-3 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/82 text-slate-700 shadow-sm transition hover:bg-white hover:text-market-900"
             onClick={() => browseSlides("previous")}
             type="button"
           >
-            {"<"}
+            <ChevronLeftIcon />
           </button>
           <button
             aria-label="Banniere suivante"
-            className="absolute right-3 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/82 text-xl font-light text-slate-700 shadow-sm transition hover:bg-white hover:text-market-900"
+            className="absolute right-3 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/82 text-slate-700 shadow-sm transition hover:bg-white hover:text-market-900"
             onClick={() => browseSlides("next")}
             type="button"
           >
-            {">"}
+            <ChevronRightIcon />
           </button>
         </section>
       </div>
@@ -344,7 +347,14 @@ export function HomeDiscoveryHero({
 }
 
 function PromoSearchCard({ promo }: { promo: HomePromoCard }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const hasText = promo.eyebrow.length > 0 || promo.title.length > 0;
+  const imageUrl = promo.imageUrl ?? "";
+  const showImage = imageUrl.length > 0 && !imageFailed;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
 
   return (
     <Link
@@ -355,13 +365,13 @@ function PromoSearchCard({ promo }: { promo: HomePromoCard }) {
         {hasText ? (
           <div>
             {promo.eyebrow ? (
-              <p className="text-2xl font-extrabold leading-tight text-slate-950">
+              <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-market-800">
                 {promo.eyebrow}
               </p>
             ) : null}
             {promo.title ? (
               <p
-                className="mt-1 text-lg font-bold leading-tight text-slate-800"
+                className="mt-2 text-2xl font-extrabold leading-tight text-slate-950"
                 dir="auto"
               >
                 {promo.title}
@@ -375,11 +385,12 @@ function PromoSearchCard({ promo }: { promo: HomePromoCard }) {
             hasText && "mt-5",
           )}
         >
-          {promo.imageUrl ? (
+          {showImage ? (
             <img
               alt={promo.alt}
               className="h-full max-h-[220px] w-full object-contain transition duration-300 group-hover:scale-[1.03]"
-              src={promo.imageUrl}
+              onError={() => setImageFailed(true)}
+              src={imageUrl}
             />
           ) : (
             <PromoVisual type={promo.visualType} />
@@ -442,16 +453,24 @@ function PromoVisual({ type }: { type: PromoVisualType }) {
 }
 
 function BannerVisual({ slide }: { slide: HomeBannerSlide }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const hasTitle = slide.title.length > 0;
   const hasSubtitle = Boolean(slide.subtitle?.trim());
+  const imageUrl = slide.imageUrl ?? "";
+  const showImage = imageUrl.length > 0 && !imageFailed;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
 
   return (
     <div className="relative h-full min-h-[292px] overflow-hidden rounded-lg bg-[linear-gradient(135deg,#ffe3c4,#fff7ed_48%,#fed7aa)] lg:min-h-0">
-      {slide.imageUrl ? (
+      {showImage ? (
         <img
           alt={slide.alt}
           className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-          src={slide.imageUrl}
+          onError={() => setImageFailed(true)}
+          src={imageUrl}
         />
       ) : (
         <>
@@ -525,4 +544,42 @@ function BannerShape({ type }: { type: BannerVisualType }) {
 
 function categoryInitial(category: Category) {
   return category.name.trim().slice(0, 1).toUpperCase();
+}
+
+function ChevronLeftIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      viewBox="0 0 16 16"
+    >
+      <path
+        d="M10 3.5 5.5 8l4.5 4.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      viewBox="0 0 16 16"
+    >
+      <path
+        d="m6 3.5 4.5 4.5L6 12.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
 }

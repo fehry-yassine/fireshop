@@ -105,12 +105,32 @@ function SectionHeader({
         ) : null}
       </div>
       <Link
-        className="mt-1 shrink-0 rounded-full px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-market-50 hover:text-market-800 sm:text-sm"
+        className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-bold text-slate-500 transition hover:bg-market-50 hover:text-market-800 sm:text-sm"
         href={href}
       >
-        En savoir plus {">"}
+        En savoir plus
+        <ChevronRightIcon />
       </Link>
     </div>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-3.5 w-3.5"
+      fill="none"
+      viewBox="0 0 16 16"
+    >
+      <path
+        d="m6 3.5 4.5 4.5L6 12.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+    </svg>
   );
 }
 
@@ -240,8 +260,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     .filter((product) => product.status === "PUBLISHED")
     .filter((product) => productMatchesSearch(product, normalizedQuery));
 
-  const recentProducts = newestFirst(publishedProducts).slice(0, 6);
-  const trendProducts = publishedProducts.slice(0, 8);
   const bestOffers = [...publishedProducts]
     .sort((a, b) => {
       const aOffer = a.offerPrice || a.isOnOffer ? 1 : 0;

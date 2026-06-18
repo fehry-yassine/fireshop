@@ -21,7 +21,7 @@ export function SearchModePageClient() {
   async function runSearch(inputText: string) {
     const nextQuery = inputText.trim();
     if (!nextQuery) {
-      setError("Please enter a product search.");
+      setError("Veuillez saisir une recherche produit.");
       return;
     }
 
@@ -39,7 +39,7 @@ export function SearchModePageClient() {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "Search request failed.",
+          : "La recherche a echoue.",
       );
     } finally {
       setIsLoading(false);
@@ -58,7 +58,7 @@ export function SearchModePageClient() {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "Could not add product to cart.",
+        : "Impossible d'ajouter ce produit au panier.",
       );
     }
   }
@@ -69,7 +69,7 @@ export function SearchModePageClient() {
         <CardContent className="space-y-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-market-700">
-              Search
+              Recherche
             </p>
             <h1 className="mt-1 text-2xl font-bold text-slate-950">Recherche produit</h1>
             <p className="mt-1 text-sm text-slate-600">
@@ -157,7 +157,7 @@ export function SearchModePageClient() {
                       {entry.product.name}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {entry.product.vendor?.storeName ?? "Local vendor"}
+                      {entry.product.vendor?.storeName ?? "Vendeur local"}
                     </p>
                     <p className="mt-1 text-base font-bold text-market-800">
                       {formatTnd(displayPrice)}
@@ -178,7 +178,7 @@ export function SearchModePageClient() {
                       }}
                       variant="secondary"
                     >
-                      Add to cart
+                      Ajouter au panier
                     </Button>
                     <Link
                       className="inline-flex h-10 flex-1 items-center justify-center rounded-lg bg-market-600 px-4 text-sm font-semibold text-white transition hover:bg-market-700"

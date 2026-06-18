@@ -150,7 +150,7 @@ export function Header() {
                 <span className="grid h-5 w-5 place-items-center rounded-full bg-gradient-to-br from-market-600 to-market-800 text-white shadow-sm shadow-market-500/25">
                   <CategoryGlyph />
                 </span>
-                <span className="hidden whitespace-nowrap xl:inline">
+                <span className="hidden whitespace-nowrap md:inline">
                   Toutes les categories
                 </span>
               </button>

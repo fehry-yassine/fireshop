@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { ApiError, api } from "@/lib/api";
+import { notifyCartUpdated } from "@/lib/cartEvents";
 import { formatTnd } from "@/lib/format";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { CartItem, CartResponse } from "@/types";
@@ -56,7 +57,7 @@ export function CartPageClient() {
 
         if (isActive) {
           setMessage({
-            text: error instanceof Error ? error.message : "Could not load cart.",
+            text: error instanceof Error ? error.message : "Impossible de charger le panier.",
             tone: "error",
           });
         }
@@ -77,11 +78,12 @@ export function CartPageClient() {
   const hasItems = Boolean(cart?.items.length);
   const itemCountLabel = useMemo(() => {
     const count = cart?.itemCount ?? 0;
-    return count === 1 ? "1 item" : `${count} items`;
+    return count === 1 ? "1 article" : `${count} articles`;
   }, [cart?.itemCount]);
 
   function applyCart(nextCart: CartResponse) {
     setCart(nextCart);
+    notifyCartUpdated(nextCart.itemCount);
     setQuantities(
       Object.fromEntries(nextCart.items.map((item) => [item.id, item.quantity])),
     );
@@ -100,10 +102,10 @@ export function CartPageClient() {
     try {
       const response = await api.cart.updateItem(item.id, { quantity: nextQuantity });
       applyCart(response);
-      setMessage({ text: "Quantity updated.", tone: "success" });
+      setMessage({ text: "Quantité mise à jour.", tone: "success" });
     } catch (error) {
       setMessage({
-        text: error instanceof Error ? error.message : "Could not update quantity.",
+        text: error instanceof Error ? error.message : "Impossible de mettre à jour la quantité.",
         tone: "error",
       });
     } finally {
@@ -118,10 +120,10 @@ export function CartPageClient() {
     try {
       const response = await api.cart.removeItem(itemId);
       applyCart(response);
-      setMessage({ text: "Item removed.", tone: "success" });
+      setMessage({ text: "Article retiré du panier.", tone: "success" });
     } catch (error) {
       setMessage({
-        text: error instanceof Error ? error.message : "Could not remove item.",
+        text: error instanceof Error ? error.message : "Impossible de retirer cet article.",
         tone: "error",
       });
     } finally {
@@ -136,10 +138,10 @@ export function CartPageClient() {
     try {
       const response = await api.cart.clear();
       applyCart(response);
-      setMessage({ text: "Cart cleared.", tone: "success" });
+      setMessage({ text: "Panier vidé.", tone: "success" });
     } catch (error) {
       setMessage({
-        text: error instanceof Error ? error.message : "Could not clear cart.",
+        text: error instanceof Error ? error.message : "Impossible de vider le panier.",
         tone: "error",
       });
     } finally {
@@ -148,11 +150,11 @@ export function CartPageClient() {
   }
 
   if (isUserLoading || (!user && !isUserLoading)) {
-    return <CartLoadingState label="Checking your session" />;
+    return <CartLoadingState label="Vérification de votre session" />;
   }
 
   if (isCartLoading) {
-    return <CartLoadingState label="Loading your cart" />;
+    return <CartLoadingState label="Chargement de votre panier" />;
   }
 
   if (!cart || !hasItems) {
@@ -161,16 +163,16 @@ export function CartPageClient() {
         <Card>
           <CardContent className="space-y-5 py-10 text-center">
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold text-slate-950">Your cart is empty</h1>
+              <h1 className="text-2xl font-bold text-slate-950">Votre panier est vide</h1>
               <p className="text-sm leading-6 text-slate-500">
-                Products you add from FireShop vendors will appear here.
+                Les produits ajoutés depuis les vendeurs FireShop apparaîtront ici.
               </p>
             </div>
             <Link
               className="inline-flex h-10 items-center justify-center rounded-lg bg-market-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-market-700"
               href="/"
             >
-              Continue shopping
+              Continuer les achats
             </Link>
           </CardContent>
         </Card>
@@ -180,22 +182,20 @@ export function CartPageClient() {
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-950 sm:text-3xl">Shopping cart</h1>
-          <p className="text-sm text-slate-500">
+      <div className="rounded-2xl border border-market-100 bg-gradient-to-r from-market-50 via-white to-white p-5 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-market-700">Étape 1</p>
+          <h1 className="text-2xl font-bold text-slate-950 sm:text-3xl">Panier</h1>
+            <p className="max-w-2xl text-sm leading-6 text-slate-600">
+              Vérifiez vos articles avant de valider votre commande COD.
+              {cart.vendor ? ` Votre panier concerne le vendeur ${cart.vendor.storeName}.` : ""}
+            </p>
+          </div>
+          <p className="rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-market-100">
             {itemCountLabel}
-            {cart.vendor ? ` from ${cart.vendor.storeName}` : ""}
           </p>
         </div>
-        <Button
-          className="sm:w-auto"
-          disabled={isClearing}
-          onClick={clearCart}
-          variant="secondary"
-        >
-          {isClearing ? "Clearing" : "Clear cart"}
-        </Button>
       </div>
 
       {message ? (
@@ -212,6 +212,17 @@ export function CartPageClient() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-slate-950">Articles sélectionnés</h2>
+            <Button
+              className="h-9 px-3"
+              disabled={isClearing}
+              onClick={clearCart}
+              variant="secondary"
+            >
+              {isClearing ? "Suppression..." : "Vider"}
+            </Button>
+          </div>
           {cart.items.map((item) => (
             <CartItemCard
               activeItemId={activeItemId}
@@ -249,25 +260,28 @@ function CartItemCard({
   quantity: number;
 }) {
   const image = item.product.images?.[0];
+  const [hasImageError, setHasImageError] = useState(false);
   const isActive = activeItemId === item.id;
   const quantityChanged = quantity !== item.quantity;
+  const imageUrl = hasImageError ? null : image?.url;
 
   return (
-    <Card>
-      <CardContent className="grid gap-4 sm:grid-cols-[112px_minmax(0,1fr)]">
+    <Card className="overflow-hidden">
+      <CardContent className="grid gap-4 sm:grid-cols-[118px_minmax(0,1fr)]">
         <Link
-          className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-slate-100"
+          className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-inner"
           href={`/product/${item.product.slug}`}
         >
-          {image?.url ? (
+          {imageUrl ? (
             <img
-              alt={image.altText ?? item.product.name}
-              className="h-full w-full object-cover"
-              src={image.url}
+              alt={image?.altText ?? item.product.name}
+              className="h-full w-full object-contain"
+              onError={() => setHasImageError(true)}
+              src={imageUrl}
             />
           ) : (
-            <span className="px-3 text-center text-xs font-semibold text-slate-500">
-              {item.product.name}
+            <span className="grid h-full w-full place-items-center rounded-lg bg-gradient-to-br from-market-50 to-slate-100 px-3 text-center text-xs font-bold text-market-800">
+              {productInitials(item.product.name)}
             </span>
           )}
         </Link>
@@ -284,7 +298,7 @@ function CartItemCard({
               <p className="text-sm text-slate-500">{item.vendor.storeName}</p>
             </div>
             <div className="shrink-0 text-left sm:text-right">
-              <p className="text-sm text-slate-500">Subtotal</p>
+              <p className="text-sm text-slate-500">Sous-total</p>
               <p className="font-bold text-slate-950">{formatTnd(item.subtotal)}</p>
             </div>
           </div>
@@ -292,20 +306,20 @@ function CartItemCard({
           <div className="grid gap-3 sm:grid-cols-[1fr_220px] sm:items-end">
             <div className="grid grid-cols-2 gap-3 text-sm sm:max-w-xs">
               <div>
-                <p className="text-slate-500">Unit price</p>
+                <p className="text-slate-500">Prix unitaire</p>
                 <p className="font-semibold text-slate-950">{formatTnd(item.unitPrice)}</p>
               </div>
               <div>
                 <p className="text-slate-500">Stock</p>
                 <p className="font-semibold text-slate-950">
-                  {item.product.stockQuantity} available
+                  {item.product.stockQuantity} disponible
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <Input
-                aria-label={`Quantity for ${item.product.name}`}
+                aria-label={`Quantité pour ${item.product.name}`}
                 className="h-9 w-24 text-center"
                 max={Math.max(item.product.stockQuantity, 1)}
                 min={1}
@@ -319,7 +333,7 @@ function CartItemCard({
                 onClick={onUpdate}
                 variant="secondary"
               >
-                Update
+                Modifier
               </Button>
               <Button
                 className="h-9 px-3"
@@ -327,7 +341,7 @@ function CartItemCard({
                 onClick={onRemove}
                 variant="ghost"
               >
-                Remove
+                Retirer
               </Button>
             </div>
           </div>
@@ -338,35 +352,38 @@ function CartItemCard({
 }
 
 function CartSummary({ cart }: { cart: CartResponse }) {
+  const itemCountLabel = cart.itemCount === 1 ? "1 article" : `${cart.itemCount} articles`;
+
   return (
     <aside className="lg:sticky lg:top-24 lg:self-start">
-      <Card>
+      <Card className="border-market-100 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
         <CardContent className="space-y-5">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">Order summary</h2>
-            <p className="text-sm text-slate-500">Cash on delivery checkout</p>
+            <h2 className="text-lg font-bold text-slate-950">Résumé de commande</h2>
+            <p className="text-sm text-slate-500">Paiement à la livraison</p>
           </div>
 
           <div className="space-y-3 border-y border-slate-200 py-4 text-sm">
-            <SummaryRow label="Items" value={`${cart.itemCount}`} />
-            <SummaryRow label="Delivery" value="Calculated at checkout" />
-            <SummaryRow label="Payment" value="Cash on delivery" />
+            <SummaryRow label="Articles" value={itemCountLabel} />
+            <SummaryRow label="Sous-total" value={formatTnd(cart.total)} />
+            <SummaryRow label="Livraison" value="Confirmée après validation du vendeur" />
+            <SummaryRow label="Paiement" value="Paiement à la livraison" />
           </div>
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-end justify-between gap-4 rounded-xl bg-market-50 px-4 py-3">
             <span className="text-base font-bold text-slate-950">Total</span>
-            <span className="text-xl font-bold text-slate-950">{formatTnd(cart.total)}</span>
+            <span className="text-2xl font-extrabold text-market-700">{formatTnd(cart.total)}</span>
           </div>
 
           <Link
             className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-market-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-market-700"
             href="/checkout"
           >
-            Proceed to checkout
+            Passer la commande
           </Link>
 
           <p className="text-xs leading-5 text-slate-500">
-            FireShop supports one-vendor COD checkout in this version.
+            Une commande COD par vendeur est prise en charge dans cette version.
           </p>
         </CardContent>
       </Card>
@@ -388,9 +405,19 @@ function CartLoadingState({ label }: { label: string }) {
     <Card>
       <CardContent className="py-10 text-center">
         <p className="text-sm font-semibold text-slate-950">{label}</p>
-        <p className="mt-2 text-sm text-slate-500">Please wait a moment.</p>
+        <p className="mt-2 text-sm text-slate-500">Veuillez patienter.</p>
       </CardContent>
     </Card>
   );
+}
+
+function productInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
 }
 

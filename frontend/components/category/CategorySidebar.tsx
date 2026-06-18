@@ -4,16 +4,22 @@ import { categoryRoute } from "@/lib/categoryRoutes";
 import { cn } from "@/lib/utils";
 
 const fallbackCategories: Array<Pick<Category, "id" | "name" | "slug">> = [
-  { id: "fashion", name: "Mode & Accessoires", slug: "fashion" },
-  { id: "electronics", name: "Electronique", slug: "electronics" },
-  { id: "home", name: "Maison & Jardin", slug: "home-garden" },
-  { id: "sports", name: "Sports & Loisirs", slug: "sports-leisure" },
-  { id: "beauty", name: "Beaute & Sante", slug: "beauty-health" },
-  { id: "jewelry", name: "Bijoux & Montres", slug: "jewelry-watches" },
-  { id: "auto", name: "Auto & Moto", slug: "auto-moto" },
-  { id: "kids", name: "Bebe & Jouets", slug: "baby-toys" },
-  { id: "office", name: "Bureau", slug: "office" },
-  { id: "local", name: "Produits locaux", slug: "local-products" },
+  {
+    id: "electronics",
+    name: "Electronics & Accessories",
+    slug: "electronics-accessories",
+  },
+  { id: "home", name: "Home & Kitchen", slug: "home-kitchen" },
+  { id: "fashion", name: "Fashion", slug: "fashion" },
+  {
+    id: "beauty",
+    name: "Beauty & Personal Care",
+    slug: "beauty-personal-care",
+  },
+  { id: "sports", name: "Sports & Fitness", slug: "sports-fitness" },
+  { id: "baby", name: "Baby & Toys", slug: "baby-toys" },
+  { id: "car", name: "Car Accessories", slug: "car-accessories" },
+  { id: "local", name: "Local Handmade", slug: "local-handmade" },
 ];
 
 type CategorySidebarProps = {

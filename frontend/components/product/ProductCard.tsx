@@ -12,6 +12,13 @@ export function ProductCard({ product }: ProductCardProps) {
   const image = product.images?.[0];
   const hasOffer = Boolean(product.offerPrice) || product.isOnOffer;
   const displayPrice = product.offerPrice ?? product.price;
+  const fallbackInitials = product.name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
 
   return (
     <Link
@@ -27,15 +34,18 @@ export function ProductCard({ product }: ProductCardProps) {
               src={image.url}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-slate-100 p-4">
-              <span className="line-clamp-3 text-center text-sm font-semibold text-slate-500">
+            <div className="flex h-full w-full flex-col items-center justify-center bg-[linear-gradient(135deg,#fff7f1,#ffffff_52%,#f8fafc)] p-4 text-center">
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-xs font-black text-market-800 shadow-sm ring-1 ring-market-200">
+                {fallbackInitials || "FS"}
+              </span>
+              <span className="mt-3 line-clamp-3 text-sm font-semibold text-slate-500">
                 {product.name}
               </span>
             </div>
           )}
           {hasOffer ? (
             <Badge className="absolute left-3 top-3 shadow-sm" tone="warning">
-              Offer
+              Offre
             </Badge>
           ) : null}
         </div>
@@ -45,18 +55,18 @@ export function ProductCard({ product }: ProductCardProps) {
               {product.name}
             </h3>
             <p className="truncate text-xs text-slate-500">
-              {product.vendor?.storeName ?? "Local vendor"}
+              {product.vendor?.storeName ?? "Vendeur local"}
             </p>
           </div>
 
           <div className="flex items-end justify-between gap-2">
             <div>
-              <p className="text-base font-bold text-slate-950">{formatTnd(displayPrice)}</p>
+              <p className="text-base font-extrabold text-market-800">{formatTnd(displayPrice)}</p>
               {hasOffer ? (
                 <p className="text-xs text-slate-400 line-through">{formatTnd(product.price)}</p>
               ) : null}
             </div>
-            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+            <span className="rounded-full bg-market-50 px-2 py-1 text-xs font-bold text-market-900 ring-1 ring-market-100">
               COD
             </span>
           </div>

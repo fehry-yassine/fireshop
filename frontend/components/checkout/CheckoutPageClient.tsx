@@ -4,14 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import { formatOrderStatus } from "@/components/orders/OrderStatus";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { ApiError, api } from "@/lib/api";
+import { notifyCartUpdated } from "@/lib/cartEvents";
 import { formatTnd } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import type { CartResponse, Order } from "@/types";
+import type { CartItem, CartResponse, Order } from "@/types";
 
 type CheckoutMessage = {
   text: string;
@@ -57,7 +60,10 @@ export function CheckoutPageClient() {
 
         if (isActive) {
           setMessage({
-            text: error instanceof Error ? error.message : "Could not load checkout.",
+            text:
+              error instanceof Error
+                ? error.message
+                : "Impossible de charger la validation de commande.",
             tone: "error",
           });
         }
@@ -93,7 +99,8 @@ export function CheckoutPageClient() {
 
       setCreatedOrder(response.order);
       setCart(null);
-      setMessage({ text: "Order created successfully.", tone: "success" });
+      notifyCartUpdated(0);
+      setMessage({ text: "Commande créée avec succès.", tone: "success" });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         router.replace("/auth/login");
@@ -110,17 +117,17 @@ export function CheckoutPageClient() {
   }
 
   if (isUserLoading || (!user && !isUserLoading)) {
-    return <CheckoutLoadingState label="Checking your session" />;
+    return <CheckoutLoadingState label="Vérification de votre session" />;
   }
 
   const currentUser = user;
 
   if (!currentUser) {
-    return <CheckoutLoadingState label="Checking your session" />;
+    return <CheckoutLoadingState label="Vérification de votre session" />;
   }
 
   if (isCartLoading) {
-    return <CheckoutLoadingState label="Loading checkout" />;
+    return <CheckoutLoadingState label="Chargement de la validation de commande" />;
   }
 
   if (createdOrder) {
@@ -132,18 +139,18 @@ export function CheckoutPageClient() {
       <section className="mx-auto max-w-2xl">
         <Card>
           <CardContent className="space-y-5 py-10 text-center">
-            <Badge tone="neutral">Empty cart</Badge>
+            <Badge tone="neutral">Panier vide</Badge>
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold text-slate-950">Nothing to checkout</h1>
+              <h1 className="text-2xl font-bold text-slate-950">Aucune commande à valider</h1>
               <p className="text-sm leading-6 text-slate-500">
-                Add products from a FireShop vendor before starting COD checkout.
+                Ajoutez des produits d'un vendeur FireShop avant de lancer la validation COD.
               </p>
             </div>
             <Link
               className="inline-flex h-10 items-center justify-center rounded-lg bg-market-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-market-700"
               href="/"
             >
-              Continue shopping
+              Continuer les achats
             </Link>
           </CardContent>
         </Card>
@@ -154,11 +161,11 @@ export function CheckoutPageClient() {
   return (
     <section className="space-y-6">
       <div className="space-y-2">
-        <Badge tone="success">Cash on delivery</Badge>
-        <h1 className="text-2xl font-bold text-slate-950 sm:text-3xl">Checkout</h1>
+        <Badge tone="success">Paiement à la livraison</Badge>
+        <h1 className="text-2xl font-bold text-slate-950 sm:text-3xl">Validation de commande</h1>
         <p className="max-w-2xl text-sm leading-6 text-slate-600">
-          You will pay when you receive your order. Confirm your delivery details and
-          the vendor will prepare your COD order.
+          Vous payez à la réception. Confirmez vos coordonnées de livraison et
+          le vendeur préparera votre commande COD.
         </p>
       </div>
 
@@ -178,47 +185,55 @@ export function CheckoutPageClient() {
         <Card>
           <CardContent className="space-y-6">
             <div>
-              <h2 className="text-lg font-bold text-slate-950">Delivery details</h2>
+              <h2 className="text-lg font-bold text-slate-950">Coordonnées de livraison</h2>
               <p className="text-sm text-slate-500">
-                These details will be attached to your COD order.
+                Ces informations seront associées à votre commande COD.
               </p>
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Customer name" name="customerName">
+                <Field label="Nom complet" name="customerName">
                   <Input
                     autoComplete="name"
                     defaultValue={currentUser.fullName}
                     id="customerName"
                     name="customerName"
+                    placeholder="Nom complet"
                     required
                   />
                 </Field>
-                <Field label="Phone" name="phone">
+                <Field label="Téléphone" name="phone">
                   <Input
                     autoComplete="tel"
                     defaultValue={currentUser.phone ?? ""}
                     id="phone"
                     name="phone"
+                    placeholder="Ex. 22 000 000"
                     required
                     type="tel"
                   />
                 </Field>
               </div>
 
-              <Field label="Address" name="address">
+              <Field label="Adresse" name="address">
                 <Input
                   autoComplete="street-address"
                   id="address"
                   name="address"
-                  placeholder="Street, building, apartment"
+                  placeholder="Rue, immeuble, appartement"
                   required
                 />
               </Field>
 
-              <Field label="City" name="city">
-                <Input autoComplete="address-level2" id="city" name="city" required />
+              <Field label="Ville" name="city">
+                <Input
+                  autoComplete="address-level2"
+                  id="city"
+                  name="city"
+                  placeholder="Ex. Sousse"
+                  required
+                />
               </Field>
 
               <Field label="Notes" name="notes">
@@ -226,16 +241,21 @@ export function CheckoutPageClient() {
                   className="min-h-24 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-market-600 focus:ring-2 focus:ring-market-600/15"
                   id="notes"
                   name="notes"
-                  placeholder="Optional delivery notes"
+                  placeholder="Notes de livraison optionnelles"
                 />
               </Field>
 
-              <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                You will pay when you receive your order. No online payment is required.
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+                <span className="font-semibold">Paiement à la livraison.</span>{" "}
+                Vous payez à la réception. Aucun paiement en ligne n'est requis.
               </div>
 
-              <Button className="h-11 w-full sm:w-auto" disabled={isSubmitting} type="submit">
-                {isSubmitting ? "Creating order" : "Place COD order"}
+              <Button
+                className="h-12 w-full text-base shadow-[0_12px_24px_rgba(234,88,12,0.22)] sm:w-auto"
+                disabled={isSubmitting}
+                type="submit"
+              >
+                {isSubmitting ? "Création de la commande..." : "Valider la commande COD"}
               </Button>
             </form>
           </CardContent>
@@ -267,23 +287,23 @@ function Field({
 }
 
 function CheckoutSummary({ cart }: { cart: CartResponse }) {
+  const itemCountLabel = cart.itemCount === 1 ? "1 article" : `${cart.itemCount} articles`;
+
   return (
     <aside className="lg:sticky lg:top-24 lg:self-start">
-      <Card>
+      <Card className="border-market-100 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
         <CardContent className="space-y-5">
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-slate-950">Order summary</h2>
+            <h2 className="text-lg font-bold text-slate-950">Résumé de commande</h2>
             <p className="text-sm text-slate-500">
-              {cart.vendor?.storeName ?? "Local vendor"}
+              {cart.vendor?.storeName ?? "Vendeur local"}
             </p>
           </div>
 
           <div className="space-y-3">
             {cart.items.map((item) => (
               <div className="flex gap-3" key={item.id}>
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-center text-xs font-semibold text-slate-500">
-                  {item.quantity}x
-                </div>
+                <CheckoutItemThumbnail item={item} />
                 <div className="min-w-0 flex-1">
                   <Link
                     className="line-clamp-2 text-sm font-semibold text-slate-950 hover:text-market-700"
@@ -291,7 +311,9 @@ function CheckoutSummary({ cart }: { cart: CartResponse }) {
                   >
                     {item.product.name}
                   </Link>
-                  <p className="text-xs text-slate-500">{item.vendor.storeName}</p>
+                  <p className="text-xs text-slate-500">
+                    {item.quantity} x {formatTnd(item.unitPrice)} - {item.vendor.storeName}
+                  </p>
                 </div>
                 <p className="shrink-0 text-sm font-bold text-slate-950">
                   {formatTnd(item.subtotal)}
@@ -301,15 +323,15 @@ function CheckoutSummary({ cart }: { cart: CartResponse }) {
           </div>
 
           <div className="space-y-3 border-y border-slate-200 py-4 text-sm">
-            <SummaryRow label="Items" value={`${cart.itemCount}`} />
-            <SummaryRow label="Subtotal" value={formatTnd(cart.total)} />
-            <SummaryRow label="Delivery" value="Confirmed by vendor" />
-            <SummaryRow label="Payment" value="Cash on delivery" />
+            <SummaryRow label="Articles" value={itemCountLabel} />
+            <SummaryRow label="Sous-total" value={formatTnd(cart.total)} />
+            <SummaryRow label="Livraison" value="Confirmée après validation du vendeur" />
+            <SummaryRow label="Paiement" value="Paiement à la livraison" />
           </div>
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-end justify-between gap-4 rounded-xl bg-market-50 px-4 py-3">
             <span className="text-base font-bold text-slate-950">Total</span>
-            <span className="text-xl font-bold text-slate-950">{formatTnd(cart.total)}</span>
+            <span className="text-2xl font-extrabold text-market-700">{formatTnd(cart.total)}</span>
           </div>
         </CardContent>
       </Card>
@@ -317,41 +339,91 @@ function CheckoutSummary({ cart }: { cart: CartResponse }) {
   );
 }
 
+function CheckoutItemThumbnail({ item }: { item: CartItem }) {
+  const image = item.product.images?.[0];
+  const [hasImageError, setHasImageError] = useState(false);
+  const imageUrl = hasImageError ? null : image?.url;
+
+  return (
+    <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-inner">
+      {imageUrl ? (
+        <img
+          alt={image?.altText ?? item.product.name}
+          className="h-full w-full object-contain"
+          onError={() => setHasImageError(true)}
+          src={imageUrl}
+        />
+      ) : (
+        <span className="grid h-full w-full place-items-center rounded-lg bg-gradient-to-br from-market-50 to-slate-100 text-xs font-bold text-market-800">
+          {productInitials(item.product.name)}
+        </span>
+      )}
+      <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-market-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+        {item.quantity}
+      </span>
+    </div>
+  );
+}
+
 function CheckoutSuccess({ order }: { order: Order }) {
+  const itemCount = getOrderItemCount(order);
+  const itemCountLabel = itemCount === 1 ? "1 article" : `${itemCount} articles`;
+
   return (
     <section className="mx-auto max-w-2xl">
-      <Card>
-        <CardContent className="space-y-6 py-10 text-center">
-          <Badge tone="success">Order created</Badge>
+      <Card className="overflow-hidden border-emerald-200 shadow-[0_18px_44px_rgba(16,185,129,0.12)]">
+        <CardContent className="space-y-4 px-5 py-6 text-center sm:px-7 sm:py-7">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 shadow-sm">
+            <SuccessIcon />
+          </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-slate-950">Your COD order is confirmed</h1>
-            <p className="text-sm leading-6 text-slate-500">
-              The vendor will prepare your order. You will pay when you receive it.
+            <Badge tone="success">Commande confirmée</Badge>
+            <h1 className="text-xl font-extrabold text-slate-950 sm:text-2xl">
+              Votre commande COD est confirmée
+            </h1>
+            <p className="mx-auto max-w-lg text-sm leading-5 text-slate-600">
+              Le vendeur préparera votre commande. Vous paierez à la réception.
             </p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-left text-sm">
-            <SummaryRow label="Order ID" value={order.id} />
-            <div className="mt-3">
-              <SummaryRow label="Status" value={order.status} />
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-left shadow-inner">
+            <div className="divide-y divide-slate-200 rounded-lg bg-white px-3 shadow-sm ring-1 ring-slate-200/70">
+              <CompactSummaryRow
+                label="Référence de commande"
+                value={formatDisplayOrderReference(order.id)}
+                valueClassName="font-extrabold tracking-wide text-market-700"
+              />
+              <CompactSummaryRow label="Statut" value={formatOrderStatus(order.status)} />
+              <CompactSummaryRow label="Vendeur" value={order.vendor.storeName} />
+              <CompactSummaryRow label="Paiement" value={formatPaymentMethod(order.paymentMethod)} />
+              <CompactSummaryRow label="Articles" value={itemCountLabel} />
+              <CompactSummaryRow
+                isStrong
+                label="Total à payer"
+                value={formatTnd(order.total)}
+                valueClassName="text-xl font-extrabold text-market-700"
+              />
             </div>
-            <div className="mt-3">
-              <SummaryRow label="Total" value={formatTnd(order.total)} />
-            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 text-left">
+            <ReassuranceItem label="Paiement à la livraison" />
+            <ReassuranceItem label="Préparation par le vendeur" />
+            <ReassuranceItem label="Suivi depuis vos commandes" />
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
             <Link
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-market-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-market-700"
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-market-600 px-5 text-sm font-semibold text-white shadow-sm shadow-market-600/20 transition-colors hover:bg-market-700"
               href="/orders"
             >
-              View orders
+              Voir mes commandes
             </Link>
             <Link
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
               href="/"
             >
-              Continue shopping
+              Continuer les achats
             </Link>
           </div>
         </CardContent>
@@ -371,15 +443,119 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function CompactSummaryRow({
+  isStrong = false,
+  label,
+  value,
+  valueClassName,
+}: {
+  isStrong?: boolean;
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4 py-2.5 text-sm",
+        isStrong && "rounded-lg bg-market-50 px-3 -mx-1 my-1",
+      )}
+    >
+      <span className="text-slate-500">{label}</span>
+      <span className={cn("min-w-0 break-words text-right font-bold text-slate-950", valueClassName)}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function ReassuranceItem({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 sm:text-sm">
+      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-200">
+        <MiniCheckIcon />
+      </span>
+      <span>{label}</span>
+    </div>
+  );
+}
+
 function CheckoutLoadingState({ label }: { label: string }) {
   return (
     <Card>
       <CardContent className="py-10 text-center">
         <p className="text-sm font-semibold text-slate-950">{label}</p>
-        <p className="mt-2 text-sm text-slate-500">Please wait a moment.</p>
+        <p className="mt-2 text-sm text-slate-500">Veuillez patienter.</p>
       </CardContent>
     </Card>
   );
+}
+
+function MiniCheckIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-3.5 w-3.5"
+      fill="none"
+      viewBox="0 0 16 16"
+    >
+      <path
+        d="m3.5 8.2 2.7 2.7 6.3-6.7"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function SuccessIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-7 w-7"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="m5.5 12.5 4.2 4.2 8.8-9.4"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.2"
+      />
+    </svg>
+  );
+}
+
+function formatPaymentMethod(method: Order["paymentMethod"]) {
+  if (method === "CASH_ON_DELIVERY") {
+    return "Paiement à la livraison";
+  }
+
+  return method;
+}
+
+function formatDisplayOrderReference(id: string) {
+  const normalizedId = id.replace(/[^a-z0-9]/gi, "").toUpperCase();
+  const suffix = normalizedId.slice(-4);
+
+  return `CMD-${suffix || "0000"}`;
+}
+
+function getOrderItemCount(order: Order) {
+  return order.items.reduce((total, item) => total + item.quantity, 0);
+}
+
+function productInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
 }
 
 function getCheckoutErrorMessage(error: unknown) {
@@ -391,6 +567,6 @@ function getCheckoutErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Could not create your order. Please try again.";
+  return "Impossible de créer votre commande. Veuillez réessayer.";
 }
 
