@@ -8,8 +8,8 @@ import {
   Role,
   VendorStatus,
 } from '@prisma/client';
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { EmailService } from '../src/notifications/email.service';
+import { NotificationsService } from '../src/notifications/notifications.service';
 import { OrdersService } from '../src/orders/orders.service';
 
 const buyerUser = {
@@ -114,43 +114,56 @@ function orderFixture(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const noopNotifications = {
+  create: async () => undefined,
+} as unknown as NotificationsService;
+
+const noopEmails = {
+  sendOrderPlacedEmail: async () => undefined,
+  sendOrderStatusEmail: async () => undefined,
+} as unknown as EmailService;
+
 function statusUpdateService(order: ReturnType<typeof orderFixture>) {
   let restoreClaims = 0;
   let stockIncrements = 0;
   let stockRestoreUpdates = 0;
 
-  const service = new OrdersService({
-    order: {
-      findUnique: async () => order,
-    },
-    $transaction: async (callback: (tx: any) => Promise<unknown>) =>
-      callback({
-        order: {
-          updateMany: async () => {
-            restoreClaims += 1;
-            return { count: restoreClaims === 1 ? 1 : 0 };
+  const service = new OrdersService(
+    {
+      order: {
+        findUnique: async () => order,
+      },
+      $transaction: async (callback: (tx: any) => Promise<unknown>) =>
+        callback({
+          order: {
+            updateMany: async () => {
+              restoreClaims += 1;
+              return { count: restoreClaims === 1 ? 1 : 0 };
+            },
+            update: async (args: { data: { status?: OrderStatus } }) => ({
+              ...order,
+              status: args.data.status ?? order.status,
+            }),
+            findUniqueOrThrow: async () => ({
+              ...order,
+              stockRestoredAt: restoreClaims > 0 ? new Date() : null,
+            }),
           },
-          update: async (args: { data: { status?: OrderStatus } }) => ({
-            ...order,
-            status: args.data.status ?? order.status,
-          }),
-          findUniqueOrThrow: async () => ({
-            ...order,
-            stockRestoredAt: restoreClaims > 0 ? new Date() : null,
-          }),
-        },
-        product: {
-          update: async (args: { data: { stockQuantity: { increment: number } } }) => {
-            stockRestoreUpdates += 1;
-            stockIncrements += args.data.stockQuantity.increment;
-            return product;
+          product: {
+            update: async (args: { data: { stockQuantity: { increment: number } } }) => {
+              stockRestoreUpdates += 1;
+              stockIncrements += args.data.stockQuantity.increment;
+              return product;
+            },
           },
-        },
-        auditLog: {
-          create: async () => ({}),
-        },
-      }),
-  } as any);
+          auditLog: {
+            create: async () => ({}),
+          },
+        }),
+    } as any,
+    noopNotifications,
+    noopEmails,
+  );
 
   return {
     service,
@@ -168,21 +181,24 @@ function statusUpdateService(order: ReturnType<typeof orderFixture>) {
 
 test('invalid COD status transitions are rejected', async () => {
   let transactionCalled = false;
-  const service = new OrdersService({
-    order: {
-      findUnique: async () => orderFixture({ status: OrderStatus.PENDING }),
-    },
-    $transaction: async () => {
-      transactionCalled = true;
-    },
-  } as any);
-
-  await assert.rejects(
-    () => service.updateAdminOrderStatus('order-1', { status: OrderStatus.DELIVERED }),
-    BadRequestException,
+  const service = new OrdersService(
+    {
+      order: {
+        findUnique: async () => orderFixture({ status: OrderStatus.PENDING }),
+      },
+      $transaction: async () => {
+        transactionCalled = true;
+      },
+    } as any,
+    noopNotifications,
+    noopEmails,
   );
 
-  assert.equal(transactionCalled, false);
+  await expect(
+    service.updateAdminOrderStatus('order-1', { status: OrderStatus.DELIVERED }),
+  ).rejects.toThrow(BadRequestException);
+
+  expect(transactionCalled).toBe(false);
 });
 
 test('cancelled COD order restores stock once', async () => {
@@ -195,9 +211,9 @@ test('cancelled COD order restores stock once', async () => {
     status: OrderStatus.CANCELLED,
   });
 
-  assert.equal(harness.restoreClaims, 2);
-  assert.equal(harness.stockRestoreUpdates, 1);
-  assert.equal(harness.stockIncrements, 2);
+  expect(harness.restoreClaims).toBe(2);
+  expect(harness.stockRestoreUpdates).toBe(1);
+  expect(harness.stockIncrements).toBe(2);
 });
 
 test('returned COD order restores stock once', async () => {
@@ -210,9 +226,9 @@ test('returned COD order restores stock once', async () => {
     status: OrderStatus.RETURNED,
   });
 
-  assert.equal(harness.restoreClaims, 2);
-  assert.equal(harness.stockRestoreUpdates, 1);
-  assert.equal(harness.stockIncrements, 2);
+  expect(harness.restoreClaims).toBe(2);
+  expect(harness.stockRestoreUpdates).toBe(1);
+  expect(harness.stockIncrements).toBe(2);
 });
 
 test('delivered COD order does not restore stock', async () => {
@@ -222,35 +238,37 @@ test('delivered COD order does not restore stock', async () => {
     status: OrderStatus.DELIVERED,
   });
 
-  assert.equal(harness.restoreClaims, 0);
-  assert.equal(harness.stockRestoreUpdates, 0);
-  assert.equal(harness.stockIncrements, 0);
+  expect(harness.restoreClaims).toBe(0);
+  expect(harness.stockRestoreUpdates).toBe(0);
+  expect(harness.stockIncrements).toBe(0);
 });
 
 test('vendor cannot update another vendor order in COD workflow', async () => {
-  const service = new OrdersService({
-    user: {
-      findUnique: async () => vendorUser,
-    },
-    vendor: {
-      findUnique: async () => vendor,
-    },
-    order: {
-      findFirst: async (args: { where: { id: string; vendorId: string } }) => {
-        assert.equal(args.where.id, 'other-order');
-        assert.equal(args.where.vendorId, vendor.id);
-        return null;
+  const service = new OrdersService(
+    {
+      user: {
+        findUnique: async () => vendorUser,
       },
-    },
-  } as any);
-
-  await assert.rejects(
-    () =>
-      service.updateVendorOrderStatus(
-        { sub: vendorUser.id, role: Role.VENDOR },
-        'other-order',
-        { status: OrderStatus.CONFIRMED },
-      ),
-    NotFoundException,
+      vendor: {
+        findUnique: async () => vendor,
+      },
+      order: {
+        findFirst: async (args: { where: { id: string; vendorId: string } }) => {
+          expect(args.where.id).toBe('other-order');
+          expect(args.where.vendorId).toBe(vendor.id);
+          return null;
+        },
+      },
+    } as any,
+    noopNotifications,
+    noopEmails,
   );
+
+  await expect(
+    service.updateVendorOrderStatus(
+      { sub: vendorUser.id, role: Role.VENDOR },
+      'other-order',
+      { status: OrderStatus.CONFIRMED },
+    ),
+  ).rejects.toThrow(NotFoundException);
 });

@@ -1,7 +1,5 @@
 import 'reflect-metadata';
 import { ProductStatus, Role, VendorStatus } from '@prisma/client';
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
 import { ProductCrudService } from '../src/products/product-crud.service';
 import { ProductLifecycleService } from '../src/products/product-lifecycle.service';
 import { ProductMediaService } from '../src/products/product-media.service';
@@ -122,10 +120,10 @@ test('stock-only vendor edit does not unpublish product', async () => {
     { stockQuantity: 7 },
   );
 
-  assert.equal(updated?.status, ProductStatus.PUBLISHED);
-  assert.equal(updated?.stockQuantity, 7);
-  assert.equal(harness.lastUpdateData?.status, undefined);
-  assert.equal(harness.lastUpdateData?.rejectionReason, undefined);
+  expect(updated?.status).toBe(ProductStatus.PUBLISHED);
+  expect(updated?.stockQuantity).toBe(7);
+  expect(harness.lastUpdateData?.status).toBe(undefined);
+  expect(harness.lastUpdateData?.rejectionReason).toBe(undefined);
 });
 
 test('content vendor edit resets product to draft', async () => {
@@ -137,10 +135,10 @@ test('content vendor edit resets product to draft', async () => {
     { name: 'Updated public name' },
   );
 
-  assert.equal(updated?.status, ProductStatus.DRAFT);
-  assert.equal(updated?.rejectionReason, null);
-  assert.equal(harness.lastUpdateData?.status, ProductStatus.DRAFT);
-  assert.equal(harness.lastUpdateData?.rejectionReason, null);
+  expect(updated?.status).toBe(ProductStatus.DRAFT);
+  expect(updated?.rejectionReason).toBe(null);
+  expect(harness.lastUpdateData?.status).toBe(ProductStatus.DRAFT);
+  expect(harness.lastUpdateData?.rejectionReason).toBe(null);
 });
 
 test('rejected product content edit clears rejection reason', async () => {
@@ -158,9 +156,9 @@ test('rejected product content edit clears rejection reason', async () => {
     { description: 'This updated description is ready for review again.' },
   );
 
-  assert.equal(updated?.status, ProductStatus.DRAFT);
-  assert.equal(updated?.rejectionReason, null);
-  assert.equal(harness.lastUpdateData?.rejectionReason, null);
+  expect(updated?.status).toBe(ProductStatus.DRAFT);
+  expect(updated?.rejectionReason).toBe(null);
+  expect(harness.lastUpdateData?.rejectionReason).toBe(null);
 });
 
 test('published product remains in marketplace after stock-only edit', async () => {
@@ -174,12 +172,8 @@ test('published product remains in marketplace after stock-only edit', async () 
 
   const response = await harness.service.findAllPublic();
 
-  assert.deepEqual(
-    response.items.map((product) => product.id),
-    ['product-1'],
-  );
-  assert.equal(response.items[0]?.status, ProductStatus.PUBLISHED);
-  assert.equal(response.items[0]?.stockQuantity, 7);
-  assert.equal(response.pagination.total, 1);
+  expect(response.items.map((product) => product.id)).toEqual(['product-1']);
+  expect(response.items[0]?.status).toBe(ProductStatus.PUBLISHED);
+  expect(response.items[0]?.stockQuantity).toBe(7);
+  expect(response.pagination.total).toBe(1);
 });
-

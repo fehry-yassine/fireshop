@@ -8,8 +8,8 @@ import {
   Role,
   VendorStatus,
 } from '@prisma/client';
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { EmailService } from '../src/notifications/email.service';
+import { NotificationsService } from '../src/notifications/notifications.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { ProductCrudService } from '../src/products/product-crud.service';
 import { ProductLifecycleService } from '../src/products/product-lifecycle.service';
@@ -133,6 +133,15 @@ function orderFixture(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const noopNotifications = {
+  create: async () => undefined,
+} as unknown as NotificationsService;
+
+const noopEmails = {
+  sendOrderPlacedEmail: async () => undefined,
+  sendOrderStatusEmail: async () => undefined,
+} as unknown as EmailService;
+
 test('vendor cannot access another vendor product', async () => {
   const prisma = {
     user: {
@@ -140,8 +149,8 @@ test('vendor cannot access another vendor product', async () => {
     },
     product: {
       findFirst: async (args: { where: { id: string; vendorId: string } }) => {
-        assert.equal(args.where.id, 'other-product');
-        assert.equal(args.where.vendorId, vendor.id);
+        expect(args.where.id).toBe('other-product');
+        expect(args.where.vendorId).toBe(vendor.id);
         return null;
       },
     },
@@ -153,43 +162,43 @@ test('vendor cannot access another vendor product', async () => {
     new ProductCrudService(prisma),
   );
 
-  await assert.rejects(
-    () =>
-      service.updateVendorProduct(
-        { sub: vendorUser.id, role: Role.VENDOR },
-        'other-product',
-        { name: 'Updated' },
-      ),
-    NotFoundException,
-  );
+  await expect(
+    service.updateVendorProduct(
+      { sub: vendorUser.id, role: Role.VENDOR },
+      'other-product',
+      { name: 'Updated' },
+    ),
+  ).rejects.toThrow(NotFoundException);
 });
 
 test('vendor cannot access another vendor order', async () => {
-  const service = new OrdersService({
-    user: {
-      findUnique: async () => vendorUser,
-    },
-    vendor: {
-      findUnique: async () => vendor,
-    },
-    order: {
-      findFirst: async (args: { where: { id: string; vendorId: string } }) => {
-        assert.equal(args.where.id, 'other-order');
-        assert.equal(args.where.vendorId, vendor.id);
-        return null;
+  const service = new OrdersService(
+    {
+      user: {
+        findUnique: async () => vendorUser,
       },
-    },
-  } as any);
-
-  await assert.rejects(
-    () =>
-      service.updateVendorOrderStatus(
-        { sub: vendorUser.id, role: Role.VENDOR },
-        'other-order',
-        { status: OrderStatus.CONFIRMED },
-      ),
-    NotFoundException,
+      vendor: {
+        findUnique: async () => vendor,
+      },
+      order: {
+        findFirst: async (args: { where: { id: string; vendorId: string } }) => {
+          expect(args.where.id).toBe('other-order');
+          expect(args.where.vendorId).toBe(vendor.id);
+          return null;
+        },
+      },
+    } as any,
+    noopNotifications,
+    noopEmails,
   );
+
+  await expect(
+    service.updateVendorOrderStatus(
+      { sub: vendorUser.id, role: Role.VENDOR },
+      'other-order',
+      { status: OrderStatus.CONFIRMED },
+    ),
+  ).rejects.toThrow(NotFoundException);
 });
 
 test('unpublished products do not appear in marketplace query', async () => {
@@ -208,48 +217,49 @@ test('unpublished products do not appear in marketplace query', async () => {
 
   const response = await service.findAllPublic();
 
-  assert.deepEqual(
-    response.items.map((product) => product.id),
-    [publishedProduct.id],
-  );
-  assert.equal((findManyWhere as { status: ProductStatus }).status, ProductStatus.PUBLISHED);
-  assert.equal((findManyWhere as { isActive: boolean }).isActive, true);
+  expect(response.items.map((product) => product.id)).toEqual([publishedProduct.id]);
+  expect((findManyWhere as { status: ProductStatus }).status).toBe(ProductStatus.PUBLISHED);
+  expect((findManyWhere as { isActive: boolean }).isActive).toBe(true);
 });
 
 test('checkout creates order with correct vendorId', async () => {
   let createdOrderVendorId: string | undefined;
   const order = orderFixture();
-  const service = new OrdersService({
-    user: {
-      findUnique: async () => buyerUser,
-    },
-    $transaction: async (callback: (tx: any) => Promise<unknown>) =>
-      callback({
-        cartItem: {
-          findMany: async () => [
-            {
-              id: 'cart-item-1',
-              userId: buyerUser.id,
-              productId: publishedProduct.id,
-              quantity: 2,
-              product: publishedProduct,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ],
-          deleteMany: async () => ({ count: 1 }),
-        },
-        order: {
-          create: async (args: { data: { vendorId: string } }) => {
-            createdOrderVendorId = args.data.vendorId;
-            return order;
+  const service = new OrdersService(
+    {
+      user: {
+        findUnique: async () => buyerUser,
+      },
+      $transaction: async (callback: (tx: any) => Promise<unknown>) =>
+        callback({
+          cartItem: {
+            findMany: async () => [
+              {
+                id: 'cart-item-1',
+                userId: buyerUser.id,
+                productId: publishedProduct.id,
+                quantity: 2,
+                product: publishedProduct,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            ],
+            deleteMany: async () => ({ count: 1 }),
           },
-        },
-        product: {
-          updateMany: async () => ({ count: 1 }),
-        },
-      }),
-  } as any);
+          order: {
+            create: async (args: { data: { vendorId: string } }) => {
+              createdOrderVendorId = args.data.vendorId;
+              return order;
+            },
+          },
+          product: {
+            updateMany: async () => ({ count: 1 }),
+          },
+        }),
+    } as any,
+    noopNotifications,
+    noopEmails,
+  );
 
   const response = await service.checkout(
     { sub: buyerUser.id, role: Role.BUYER },
@@ -261,49 +271,51 @@ test('checkout creates order with correct vendorId', async () => {
     },
   );
 
-  assert.equal(createdOrderVendorId, vendor.id);
-  assert.equal(response.order.vendor.id, vendor.id);
+  expect(createdOrderVendorId).toBe(vendor.id);
+  expect(response.order.vendor.id).toBe(vendor.id);
 });
 
 test('cancelled order restores stock once', async () => {
   let restoreClaims = 0;
   let stockIncrements = 0;
   const order = orderFixture();
-  const service = new OrdersService({
-    order: {
-      findUnique: async () => order,
-    },
-    $transaction: async (callback: (tx: any) => Promise<unknown>) =>
-      callback({
-        order: {
-          updateMany: async () => {
-            restoreClaims += 1;
-            return { count: restoreClaims === 1 ? 1 : 0 };
+  const service = new OrdersService(
+    {
+      order: {
+        findUnique: async () => order,
+      },
+      $transaction: async (callback: (tx: any) => Promise<unknown>) =>
+        callback({
+          order: {
+            updateMany: async () => {
+              restoreClaims += 1;
+              return { count: restoreClaims === 1 ? 1 : 0 };
+            },
+            update: async () => ({ ...order, status: OrderStatus.CANCELLED }),
+            findUniqueOrThrow: async () => ({
+              ...order,
+              status: OrderStatus.CANCELLED,
+              stockRestoredAt: new Date(),
+            }),
           },
-          update: async () => ({ ...order, status: OrderStatus.CANCELLED }),
-          findUniqueOrThrow: async () => ({
-            ...order,
-            status: OrderStatus.CANCELLED,
-            stockRestoredAt: new Date(),
-          }),
-        },
-        product: {
-          update: async (args: { data: { stockQuantity: { increment: number } } }) => {
-            stockIncrements += args.data.stockQuantity.increment;
-            return publishedProduct;
+          product: {
+            update: async (args: { data: { stockQuantity: { increment: number } } }) => {
+              stockIncrements += args.data.stockQuantity.increment;
+              return publishedProduct;
+            },
           },
-        },
-        auditLog: {
-          create: async () => ({}),
-        },
-      }),
-  } as any);
+          auditLog: {
+            create: async () => ({}),
+          },
+        }),
+    } as any,
+    noopNotifications,
+    noopEmails,
+  );
 
   await service.updateAdminOrderStatus('order-1', { status: OrderStatus.CANCELLED });
   await service.updateAdminOrderStatus('order-1', { status: OrderStatus.CANCELLED });
 
-  assert.equal(stockIncrements, 2);
-  assert.equal(restoreClaims, 2);
+  expect(stockIncrements).toBe(2);
+  expect(restoreClaims).toBe(2);
 });
-
-
