@@ -82,7 +82,7 @@ export function VendorProductForm({
   );
 
   const statusForDisplay = product?.status ?? "DRAFT";
-  const title = mode === "create" ? "Create a product" : product?.name ?? "Edit product";
+  const title = mode === "create" ? "Créer un produit" : product?.name ?? "Modifier le produit";
   const canPublishFromEdit =
     mode === "edit" && (product?.status === "DRAFT" || product?.status === "REJECTED");
   const isSaveDisabled = !isDraftValid(draft) || isSubmitting || isUploadingImages;
@@ -96,7 +96,7 @@ export function VendorProductForm({
 
     if (draft.imageUrls.length + selectedFiles.length > MAX_IMAGES) {
       setMessage({
-        text: `You can upload up to ${MAX_IMAGES} images per product.`,
+        text: `Vous pouvez ajouter jusqu'à ${MAX_IMAGES} images par produit.`,
         tone: "error",
       });
       return;
@@ -110,11 +110,11 @@ export function VendorProductForm({
 
       for (const file of selectedFiles) {
         if (!isSupportedImageFile(file)) {
-          throw new Error("Only PNG, JPG, JPEG, WEBP, or GIF images are supported.");
+          throw new Error("Seules les images PNG, JPG, JPEG, WEBP ou GIF sont acceptées.");
         }
 
         if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
-          throw new Error("Image is too large. Please upload a smaller image.");
+          throw new Error("L'image est trop volumineuse. Veuillez en choisir une plus petite.");
         }
 
         const response = await api.vendors.products.uploadImage(file);
@@ -159,16 +159,16 @@ export function VendorProductForm({
 
         if (intent === "publish") {
           await api.vendors.products.publish(createdProduct.id);
-          await onSaved("Product submitted for admin review");
+          await onSaved("Produit envoyé en validation");
           return;
         }
 
-        await onSaved("Product saved as draft.");
+        await onSaved("Produit enregistré comme brouillon.");
         return;
       }
 
       if (!product) {
-        throw new Error("Product is missing.");
+        throw new Error("Le produit est introuvable.");
       }
 
       const updatedProduct = await api.vendors.products.update(product.id, payload);
@@ -179,10 +179,10 @@ export function VendorProductForm({
         return;
       }
 
-      await onSaved("Product updated.");
+      await onSaved("Produit mis à jour.");
     } catch (error) {
       setMessage({
-        text: getProductFormError(error, "Could not save product."),
+        text: getProductFormError(error, "Impossible d'enregistrer le produit."),
         tone: "error",
       });
     } finally {
@@ -190,8 +190,8 @@ export function VendorProductForm({
     }
   }
 
-  const saveLabel = mode === "create" ? "Save as draft" : "Save changes";
-  const publishLabel = mode === "create" ? "Publish" : "Publish for review";
+  const saveLabel = mode === "create" ? "Enregistrer le brouillon" : "Enregistrer les modifications";
+  const publishLabel = "Envoyer en validation";
 
   return (
     <div className="vendor-editor flex h-full min-h-0 flex-col">
@@ -199,7 +199,7 @@ export function VendorProductForm({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <button
-              aria-label="Close product editor"
+              aria-label="Fermer l'éditeur de produit"
               className="vendor-icon-button mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-lg font-bold transition-colors focus-visible:outline-none focus-visible:ring-2"
               onClick={onCancel}
               type="button"
@@ -208,7 +208,7 @@ export function VendorProductForm({
             </button>
             <div className="min-w-0">
               <p className="vendor-muted text-xs font-semibold uppercase tracking-normal">
-                Product editor
+                Éditeur de produit
               </p>
               <h2 className="vendor-title truncate text-xl font-bold">{title}</h2>
               {mode === "edit" && product ? (
@@ -227,7 +227,7 @@ export function VendorProductForm({
               type="submit"
               variant="secondary"
             >
-              {isSubmitting && submitIntent === "save" ? "Saving" : saveLabel}
+              {isSubmitting && submitIntent === "save" ? "Enregistrement" : saveLabel}
             </Button>
             {mode === "create" || canPublishFromEdit ? (
               <Button
@@ -237,7 +237,7 @@ export function VendorProductForm({
                 onClick={() => setSubmitIntent("publish")}
                 type="submit"
               >
-                {isSubmitting && submitIntent === "publish" ? "Publishing" : publishLabel}
+                {isSubmitting && submitIntent === "publish" ? "Envoi en cours" : publishLabel}
               </Button>
             ) : null}
           </div>
@@ -251,7 +251,7 @@ export function VendorProductForm({
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
             <form className="space-y-4" id={formId} onSubmit={handleSubmit}>
               <Card className="vendor-card overflow-hidden">
-                <SectionHeader eyebrow="Details" title="Product identity" />
+                <SectionHeader eyebrow="Détails" title="Identité du produit" />
                 <CardContent className="space-y-5">
                   <ImagePickerEditor
                     imageUrls={draft.imageUrls}
@@ -267,20 +267,20 @@ export function VendorProductForm({
                     }
                   />
 
-                  <Field label="Product title" name="name">
+                  <Field label="Titre du produit" name="name">
                     <Input
                       className="vendor-input"
                       id="name"
                       onChange={(event) =>
                         setDraft((current) => ({ ...current, name: event.target.value }))
                       }
-                      placeholder="Product title"
+                      placeholder="Titre du produit"
                       required
                       value={draft.name}
                     />
                   </Field>
 
-                  <Field label="Category" name="categoryId">
+                  <Field label="Catégorie" name="categoryId">
                     <select
                       className="vendor-select h-10 w-full rounded-lg px-3 text-sm outline-none transition focus:ring-2"
                       id="categoryId"
@@ -290,7 +290,7 @@ export function VendorProductForm({
                       required
                       value={draft.categoryId}
                     >
-                      <option value="">Select category</option>
+                      <option value="">Sélectionnez une catégorie</option>
                       {categories.map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}
@@ -302,9 +302,9 @@ export function VendorProductForm({
               </Card>
 
               <Card className="vendor-card overflow-hidden">
-                <SectionHeader eyebrow="Pricing" title="Selling price" />
+                <SectionHeader eyebrow="Prix" title="Prix de vente" />
                 <CardContent className="space-y-4">
-                  <Field label="Price" name="price">
+                  <Field label="Prix" name="price">
                     <Input
                       className="vendor-input"
                       id="price"
@@ -323,9 +323,9 @@ export function VendorProductForm({
               </Card>
 
               <Card className="vendor-card overflow-hidden">
-                <SectionHeader eyebrow="Inventory" title="Stock quantity" />
+                <SectionHeader eyebrow="Stock" title="Quantité en stock" />
                 <CardContent className="space-y-4">
-                  <Field label="Stock quantity" name="stockQuantity">
+                  <Field label="Quantité en stock" name="stockQuantity">
                     <Input
                       className="vendor-input"
                       id="stockQuantity"
@@ -345,14 +345,14 @@ export function VendorProductForm({
               </Card>
 
               <Card className="vendor-card overflow-hidden">
-                <SectionHeader eyebrow="Description" title="Buyer-facing content" />
+                <SectionHeader eyebrow="Description" title="Contenu visible par l'acheteur" />
                 <CardContent>
                   <textarea
                     className="vendor-input min-h-44 w-full resize-y rounded-lg px-3 py-3 text-sm leading-6 outline-none transition focus:ring-2"
                     onChange={(event) =>
                       setDraft((current) => ({ ...current, description: event.target.value }))
                     }
-                    placeholder="Write a clear buyer-facing product description."
+                    placeholder="Rédigez une description claire et visible par l'acheteur."
                     value={draft.description}
                   />
                 </CardContent>
@@ -426,20 +426,20 @@ function ImagePickerEditor({
           >
             {primaryImageUrl ? (
               <img
-                alt="Primary product preview"
+                alt="Aperçu principal du produit"
                 className="h-full w-full object-cover"
                 src={primaryImageUrl}
               />
             ) : (
               <span className="px-2 text-center text-xs">
-                <span className="vendor-title block font-semibold">Click to add photos</span>
+                <span className="vendor-title block font-semibold">Cliquez pour ajouter des photos</span>
                 <span className="vendor-muted block font-medium">PNG JPG WEBP GIF</span>
               </span>
             )}
           </button>
           {primaryImageUrl ? (
             <button
-              aria-label="Remove image 1"
+              aria-label="Supprimer l'image 1"
               className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/75 text-xs font-bold text-white transition hover:bg-slate-950"
               onClick={() => onRemove(0)}
               type="button"
@@ -458,16 +458,16 @@ function ImagePickerEditor({
               key={`${url}-${imageIndex}`}
             >
               <button
-                aria-label={`Add more photos from image ${imageIndex + 1}`}
+                aria-label={`Ajouter d'autres photos`}
                 className="h-full w-full"
                 disabled={isUploading}
                 onClick={openFilePicker}
                 type="button"
               >
-                <img alt={`Product preview ${imageIndex + 1}`} className="h-full w-full object-cover" src={url} />
+                <img alt={`Aperçu du produit ${imageIndex + 1}`} className="h-full w-full object-cover" src={url} />
               </button>
               <button
-                aria-label={`Remove image ${imageIndex + 1}`}
+                aria-label={`Supprimer l'image ${imageIndex + 1}`}
                 className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/75 text-xs font-bold text-white transition hover:bg-slate-950"
                 onClick={() => onRemove(imageIndex)}
                 type="button"
@@ -486,13 +486,13 @@ function ImagePickerEditor({
               onClick={openFilePicker}
               type="button"
             >
-              <span className="vendor-accent-text">+ Add photo</span>
+              <span className="vendor-accent-text">+ Ajouter une photo</span>
             </button>
           </div>
         ) : null}
       </div>
 
-      <p className="text-xs text-slate-500">Up to {MAX_IMAGES} images, max 5MB each.</p>
+      <p className="text-xs text-slate-500">Jusqu'à {MAX_IMAGES} images, 5 Mo max. chacune.</p>
 
       <input
         accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif"
@@ -518,21 +518,21 @@ function ProductPreviewCard({
   return (
     <aside className="space-y-3 xl:sticky xl:top-28 xl:self-start">
       <p className="vendor-muted text-xs font-semibold uppercase tracking-normal">
-        Live preview
+        Aperçu
       </p>
       <Card className="vendor-card overflow-hidden">
         <div className="vendor-upload-zone flex aspect-square items-center justify-center">
           {imageUrl ? (
-            <img alt="Product preview" className="h-full w-full object-cover" src={imageUrl} />
+            <img alt="Aperçu du produit" className="h-full w-full object-cover" src={imageUrl} />
           ) : (
-            <span className="vendor-accent-text text-sm font-bold">Product image</span>
+            <span className="vendor-accent-text text-sm font-bold">Image du produit</span>
           )}
         </div>
         <CardContent className="space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="vendor-title line-clamp-2 font-bold">
-                {draft.name.trim() || "Product title"}
+                {draft.name.trim() || "Titre du produit"}
               </p>
               <p className="vendor-accent-text mt-1 text-sm font-bold">
                 {formatTnd(draft.price)}
@@ -541,7 +541,7 @@ function ProductPreviewCard({
             <ProductStatusBadge status={productStatus} />
           </div>
           <div className="vendor-panel-inset rounded-lg border px-3 py-2 text-sm">
-            Stock: <span className="vendor-title font-bold">{draft.stockQuantity || "0"}</span>
+            Stock : <span className="vendor-title font-bold">{draft.stockQuantity || "0"}</span>
           </div>
         </CardContent>
       </Card>
@@ -586,7 +586,7 @@ function ProductStatusBadge({ status }: { status?: Product["status"] }) {
   if (status === "DRAFT") {
     return (
       <Badge className="vendor-status-neutral" tone="neutral">
-        Draft
+        Brouillon
       </Badge>
     );
   }
@@ -594,7 +594,7 @@ function ProductStatusBadge({ status }: { status?: Product["status"] }) {
   if (status === "PUBLISHED") {
     return (
       <Badge className="vendor-status-success" tone="neutral">
-        Published
+        Publié
       </Badge>
     );
   }
@@ -602,7 +602,7 @@ function ProductStatusBadge({ status }: { status?: Product["status"] }) {
   if (status === "PENDING_REVIEW") {
     return (
       <Badge className="vendor-status-warning" tone="neutral">
-        Pending review
+        En validation
       </Badge>
     );
   }
@@ -610,18 +610,18 @@ function ProductStatusBadge({ status }: { status?: Product["status"] }) {
   if (status === "REJECTED") {
     return (
       <Badge className="vendor-status-danger" tone="neutral">
-        Rejected
+        Refusé
       </Badge>
     );
   }
 
   if (status === "ARCHIVED") {
-    return <Badge className="vendor-status-neutral">Archived</Badge>;
+    return <Badge className="vendor-status-neutral">Archivé</Badge>;
   }
 
   return (
     <Badge className="vendor-status-neutral" tone="neutral">
-      Draft
+      Brouillon
     </Badge>
   );
 }
@@ -670,7 +670,7 @@ function getImageUploadError(error: unknown) {
   if (error instanceof ApiError) {
     const text = error.message.toLowerCase();
     if (error.status === 413 || text.includes("too large") || text.includes("file too large")) {
-      return "Image is too large. Please upload a smaller image.";
+      return "L'image est trop volumineuse. Veuillez en choisir une plus petite.";
     }
 
     return error.message;
@@ -678,7 +678,7 @@ function getImageUploadError(error: unknown) {
 
   if (error instanceof Error) {
     if (error.message.toLowerCase().includes("too large")) {
-      return "Image is too large. Please upload a smaller image.";
+      return "L'image est trop volumineuse. Veuillez en choisir une plus petite.";
     }
 
     return error.message;

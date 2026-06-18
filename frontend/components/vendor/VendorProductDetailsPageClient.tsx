@@ -43,14 +43,14 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
         }
 
         if (!selectedProduct) {
-          setError("Product not found in your vendor catalog.");
+          setError("Produit introuvable dans votre catalogue vendeur.");
           return;
         }
 
         setProduct(selectedProduct);
       } catch (requestError) {
         if (isActive) {
-          setError(getProductError(requestError, "Could not load product."));
+          setError(getProductError(requestError, "Impossible de charger le produit."));
         }
       } finally {
         if (isActive) {
@@ -70,8 +70,8 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
     return (
       <Card className="vendor-card">
         <CardContent className="py-12 text-center">
-          <p className="vendor-title text-sm font-semibold">Loading product</p>
-          <p className="vendor-muted mt-2 text-sm">Please wait a moment.</p>
+          <p className="vendor-title text-sm font-semibold">Chargement du produit</p>
+          <p className="vendor-muted mt-2 text-sm">Veuillez patienter un instant.</p>
         </CardContent>
       </Card>
     );
@@ -81,12 +81,12 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
     return (
       <Card className="vendor-card">
         <CardContent className="py-12 text-center">
-          <p className="vendor-title text-lg font-bold">{error ?? "Product not found."}</p>
+          <p className="vendor-title text-lg font-bold">{error ?? "Produit introuvable."}</p>
           <Link
             className="vendor-primary-action mt-5 inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-bold transition-colors"
             href="/vendor/products"
           >
-            Back to products
+            Retour aux produits
           </Link>
         </CardContent>
       </Card>
@@ -100,10 +100,10 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Link className="vendor-accent-text text-sm font-bold" href="/vendor/products">
-            Products
+            Produits
           </Link>
           <h2 className="vendor-title mt-2 text-2xl font-bold sm:text-3xl">
-            Product details
+            Détails du produit
           </h2>
         </div>
         <ProductStatusBadge status={product.status} />
@@ -120,7 +120,7 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
                   src={image.url}
                 />
               ) : (
-                <span className="vendor-accent-text text-sm font-bold">No image</span>
+                <span className="vendor-accent-text text-sm font-bold">Aucune image</span>
               )}
             </div>
             {product.images && product.images.length > 1 ? (
@@ -151,22 +151,22 @@ function VendorProductDetailsContent({ productId }: { productId: string }) {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <InfoTile label="Price" value={formatTnd(product.offerPrice ?? product.price)} />
+              <InfoTile label="Prix" value={formatTnd(product.offerPrice ?? product.price)} />
               <InfoTile label="Stock" value={`${product.stockQuantity}`} />
-              <InfoTile label="Category" value={product.category?.name ?? "Uncategorized"} />
-              <InfoTile label="Created date" value={formatDate(product.createdAt)} />
+              <InfoTile label="Catégorie" value={product.category?.name ?? "Sans catégorie"} />
+              <InfoTile label="Date de création" value={formatDate(product.createdAt)} />
             </div>
 
             <div>
               <p className="vendor-title text-sm font-bold">Description</p>
               <p className="vendor-panel-inset mt-2 whitespace-pre-line rounded-lg border p-4 text-sm leading-6">
-                {product.description || "No description provided."}
+                {product.description || "Aucune description fournie."}
               </p>
             </div>
 
             {product.rejectionReason ? (
               <div>
-                <p className="text-sm font-bold text-red-600">Rejection reason</p>
+                <p className="text-sm font-bold text-red-600">Motif de refus</p>
                 <p className="mt-2 whitespace-pre-line rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
                   {product.rejectionReason}
                 </p>
@@ -192,7 +192,7 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
   if (status === "DRAFT") {
     return (
       <Badge className="vendor-status-neutral" tone="neutral">
-        Draft
+        Brouillon
       </Badge>
     );
   }
@@ -200,7 +200,7 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
   if (status === "PUBLISHED") {
     return (
       <Badge className="vendor-status-success" tone="neutral">
-        Published
+        Publié
       </Badge>
     );
   }
@@ -208,7 +208,7 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
   if (status === "PENDING_REVIEW") {
     return (
       <Badge className="vendor-status-warning" tone="neutral">
-        Pending review
+        En validation
       </Badge>
     );
   }
@@ -216,17 +216,17 @@ function ProductStatusBadge({ status }: { status: Product["status"] }) {
   if (status === "REJECTED") {
     return (
       <Badge className="vendor-status-danger" tone="neutral">
-        Rejected
+        Refusé
       </Badge>
     );
   }
 
-  return <Badge className="vendor-status-neutral">Archived</Badge>;
+  return <Badge className="vendor-status-neutral">Archivé</Badge>;
 }
 
 function formatDate(value: string | undefined) {
   if (!value) {
-    return "Not available";
+    return "Non disponible";
   }
 
   const date = new Date(value);
@@ -235,7 +235,7 @@ function formatDate(value: string | undefined) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-TN", {
+  return new Intl.DateTimeFormat("fr-TN", {
     dateStyle: "medium",
   }).format(date);
 }
