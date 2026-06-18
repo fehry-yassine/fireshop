@@ -40,6 +40,7 @@ Key fields:
 - description
 - logo_url
 - status: PENDING, APPROVED, REJECTED, SUSPENDED
+- is_active
 - commission_rate
 - created_at
 - updated_at
@@ -98,7 +99,9 @@ Key fields:
 - price
 - offer_price
 - stock_quantity
-- status: DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, ARCHIVED
+- status: DRAFT, PENDING_REVIEW, PUBLISHED, REJECTED, ARCHIVED
+- rejection_reason
+- is_active
 - is_featured
 - is_on_offer
 - created_at
@@ -110,6 +113,15 @@ Relationships:
 - One product belongs to one category.
 - One product can have many images.
 - One product can appear in many order items.
+
+V1 lifecycle:
+
+- Vendors create products as DRAFT.
+- Vendors submit ready products as PENDING_REVIEW.
+- Admin approval changes products to PUBLISHED.
+- Admin rejection changes products to REJECTED and stores a rejection reason.
+- Archived products are not public.
+- Public product browsing shows only active PUBLISHED products from active categories and approved active vendors.
 
 ### product_images
 
@@ -165,10 +177,12 @@ Key fields:
 - subtotal
 - delivery_fee
 - total
-- status: PENDING, CONFIRMED, PREPARING, READY_FOR_DELIVERY, DELIVERED, CANCELLED, RETURNED
+- status: PENDING, CONFIRMED, SHIPPED, DELIVERED, RETURNED, CANCELLED
 - payment_method: CASH_ON_DELIVERY
 - payment_status: UNPAID, PAID, CANCELLED
 - notes
+- vendor_deleted_at
+- stock_restored_at
 - created_at
 - updated_at
 
@@ -182,6 +196,10 @@ V1 rules:
 
 - One order contains products from one vendor only.
 - Payment is tracked directly on the order because V1 is COD only.
+- Orders are created by buyer checkout, not manually by vendors.
+- Vendors manage fulfillment status only for orders belonging to their own store.
+- Status transitions are controlled: PENDING -> CONFIRMED/CANCELLED, CONFIRMED -> SHIPPED/CANCELLED, SHIPPED -> DELIVERED/RETURNED.
+- CANCELLED and RETURNED restore stock once using stock_restored_at.
 
 ### order_items
 
@@ -217,4 +235,3 @@ Why this matters:
 - Vendor approval protects the marketplace from fake or low-quality sellers.
 - Product approval gives the admin moderation control.
 - Reviews, in-app notifications, saved addresses, and separate payment records are future scope, not V1 scope.
-
