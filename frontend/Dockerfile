@@ -2,10 +2,14 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-COPY frontend/package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+COPY frontend/package.json frontend/package.json
+COPY backend/package.json backend/package.json
+RUN npm ci --workspace frontend --include-workspace-root=false
 
-COPY frontend ./
+COPY frontend ./frontend
+
+WORKDIR /app/frontend
 
 RUN npm run build
 

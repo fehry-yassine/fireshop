@@ -6,10 +6,14 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 
-COPY backend/package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+COPY backend/package.json backend/package.json
+COPY frontend/package.json frontend/package.json
+RUN npm ci --workspace backend --include-workspace-root=false
 
-COPY backend ./
+COPY backend ./backend
+
+WORKDIR /app/backend
 
 RUN npx prisma generate
 RUN npm run build

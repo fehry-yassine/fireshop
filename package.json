@@ -8,13 +8,17 @@
     "backend"
   ],
   "scripts": {
+    "build": "npm --workspaces run build",
     "dev:frontend": "npm --workspace frontend run dev",
     "dev:backend": "npm --workspace backend run start:dev",
     "lint": "npm --workspaces run lint",
-    "test": "npm --workspaces run test"
+    "test": "npm --workspaces run test",
+    "typecheck": "npm --workspaces run typecheck"
   },
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "qs": "6.15.2"
   }
 }
-

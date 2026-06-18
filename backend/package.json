@@ -9,7 +9,10 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
-    "test": "node --test --require ts-node/register test/*.test.ts",
+    "lint": "npm run typecheck",
+    "test": "jest",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit --project tsconfig.build.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:status": "prisma migrate status",
@@ -31,12 +34,30 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": ".",
+    "testRegex": "test/.*\\.test\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": ["ts-jest", {
+        "tsconfig": {
+          "types": ["jest", "node"]
+        }
+      }]
+    },
+    "collectCoverageFrom": ["src/**/*.ts"],
+    "coverageDirectory": "./coverage",
+    "testEnvironment": "node"
+  },
   "devDependencies": {
     "@nestjs/cli": "^11.0.21",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
+    "jest": "^30.4.2",
     "prisma": "^6.19.3",
+    "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^6.0.3"
