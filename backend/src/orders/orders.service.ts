@@ -43,19 +43,6 @@ type StatusPayload = {
   status?: unknown;
 };
 
-type VendorOrderCreatePayload = {
-  status?: unknown;
-  fullName?: unknown;
-  phone?: unknown;
-  address?: unknown;
-  city?: unknown;
-  governorate?: unknown;
-  postalCode?: unknown;
-  notes?: unknown;
-  productId?: unknown;
-  quantity?: unknown;
-};
-
 type VendorOrderUpdatePayload = {
   status?: unknown;
   fullName?: unknown;
@@ -484,98 +471,6 @@ export class OrdersService {
       actorUserId: currentUser.sub,
       action: 'VENDOR_ORDER_STATUS_CHANGED',
     });
-  }
-
-  async createVendorOrder(currentUser: AuthTokenPayload, payload: unknown) {
-    const vendor = await this.findActiveVendorForUser(currentUser.sub);
-    const body = this.asVendorOrderCreatePayload(payload);
-    const shippingFullName = this.requiredString(body.fullName, 'fullName');
-    const shippingPhone = this.requiredString(body.phone, 'phone');
-    const shippingAddressLine1 = this.requiredString(body.address, 'address');
-    const shippingCity = this.requiredString(body.city, 'city');
-    const shippingGovernorate =
-      this.optionalString(body.governorate, 'governorate') ?? shippingCity;
-    const shippingPostalCode = this.optionalString(body.postalCode, 'postalCode');
-    const notes = this.optionalString(body.notes, 'notes');
-    const productId = this.requiredString(body.productId, 'productId');
-    const quantity = this.requiredPositiveInt(body.quantity, 'quantity');
-    const nextStatus = this.optionalOrderStatus(body.status) ?? OrderStatus.PENDING;
-
-    const order = await this.prisma.$transaction(async (tx) => {
-      const product = await tx.product.findFirst({
-        where: {
-          id: productId,
-          vendorId: vendor.id,
-          isActive: true,
-          status: ProductStatus.PUBLISHED,
-          category: { isActive: true },
-        },
-      });
-
-      if (!product) {
-        throw new BadRequestException('Selected product is not available');
-      }
-
-      this.ensureStockAvailable(product, quantity);
-
-      const unitPrice = this.unitPrice(product);
-      const subtotal = this.money(unitPrice * quantity);
-      const deliveryFee = 0;
-      const total = this.money(subtotal + deliveryFee);
-
-      const createdOrder = await tx.order.create({
-        data: {
-          buyerId: vendor.userId,
-          vendorId: vendor.id,
-          shippingFullName,
-          shippingPhone,
-          shippingAddressLine1,
-          shippingCity,
-          shippingGovernorate,
-          shippingPostalCode,
-          subtotal,
-          deliveryFee,
-          total,
-          status: nextStatus,
-          paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
-          paymentStatus: PaymentStatus.UNPAID,
-          notes,
-          items: {
-            create: [
-              {
-                productId: product.id,
-                productName: product.name,
-                productSlug: product.slug,
-                unitPrice,
-                quantity,
-                subtotal,
-              },
-            ],
-          },
-        },
-        include: this.orderInclude(),
-      });
-
-      const updateResult = await tx.product.updateMany({
-        where: {
-          id: product.id,
-          stockQuantity: { gte: quantity },
-        },
-        data: {
-          stockQuantity: { decrement: quantity },
-        },
-      });
-
-      if (updateResult.count !== 1) {
-        throw new BadRequestException(
-          `${product.name} no longer has enough stock`,
-        );
-      }
-
-      return createdOrder;
-    });
-
-    return { order: this.toOrderResponse(order) };
   }
 
   async updateVendorOrder(
@@ -1064,14 +959,6 @@ export class OrdersService {
     return payload as StatusPayload;
   }
 
-  private asVendorOrderCreatePayload(payload: unknown): VendorOrderCreatePayload {
-    if (!payload || typeof payload !== 'object') {
-      throw new BadRequestException('Request body is required');
-    }
-
-    return payload as VendorOrderCreatePayload;
-  }
-
   private asVendorOrderUpdatePayload(payload: unknown): VendorOrderUpdatePayload {
     if (!payload || typeof payload !== 'object') {
       throw new BadRequestException('Request body is required');
@@ -1150,16 +1037,6 @@ export class OrdersService {
     }
 
     return value as OrderStatus;
-  }
-
-  private requiredPositiveInt(value: unknown, field: string) {
-    const parsed = Number(value);
-
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      throw new BadRequestException(`${field} must be a positive integer`);
-    }
-
-    return parsed;
   }
 
   private unitPrice(product: Product) {

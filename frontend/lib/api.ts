@@ -330,11 +330,6 @@ export const vendors = {
     request<PaginatedResponse<Order>>("/vendors/orders", { query }).then(
       (response) => response.items,
     ),
-  createOrder: (payload: VendorOrderUpsertPayload) =>
-    request<{ order: Order }>("/vendors/orders", {
-      method: "POST",
-      body: payload,
-    }),
   deleteOrder: (id: string) =>
     request<{ order: Order }>(`/vendors/orders/${id}`, {
       method: "DELETE",

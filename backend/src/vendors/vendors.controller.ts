@@ -78,15 +78,6 @@ export class VendorsController {
     );
   }
 
-  @Post('orders')
-  @UseGuards(JwtAuthGuard)
-  createVendorOrder(
-    @CurrentUser() currentUser: AuthTokenPayload,
-    @Body() body: unknown,
-  ) {
-    return this.ordersService.createVendorOrder(currentUser, body ?? {});
-  }
-
   @Patch('orders/:id')
   @UseGuards(JwtAuthGuard)
   updateVendorOrder(

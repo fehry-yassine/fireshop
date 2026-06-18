@@ -327,8 +327,6 @@ export type VendorOrderUpsertPayload = {
   governorate?: string;
   postalCode?: string;
   notes?: string;
-  productId?: string;
-  quantity?: number;
 };
 
 export type NotificationType =
