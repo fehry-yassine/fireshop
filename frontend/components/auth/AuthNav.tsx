@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import { CART_UPDATED_EVENT, readCartUpdatedDetail } from "@/lib/cartEvents";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { PublicUser } from "@/types";
@@ -23,6 +24,7 @@ const roleLabels: Record<PublicUser["role"], string> = {
 
 const accountLinks: Record<PublicUser["role"], NavLink[]> = {
   BUYER: [
+    { label: "Tableau de bord", href: "/account" },
     { label: "Mes commandes", href: "/orders" },
     { label: "Mon panier", href: "/cart" },
   ],
@@ -47,6 +49,49 @@ export function AuthNav() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [cartItemCount, setCartItemCount] = useState<number | null>(null);
+  const shouldShowCart = Boolean(user && user.role !== "ADMIN");
+
+  const refreshCartCount = useCallback(async () => {
+    if (!user || user.role === "ADMIN") {
+      setCartItemCount(null);
+      return;
+    }
+
+    try {
+      const response = await api.cart.get();
+      setCartItemCount(response.itemCount);
+    } catch {
+      setCartItemCount(null);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void refreshCartCount();
+  }, [refreshCartCount]);
+
+  useEffect(() => {
+    if (!shouldShowCart) {
+      return;
+    }
+
+    function handleCartUpdated(event: Event) {
+      const detail = readCartUpdatedDetail(event);
+
+      if (typeof detail?.itemCount === "number") {
+        setCartItemCount(detail.itemCount);
+        return;
+      }
+
+      void refreshCartCount();
+    }
+
+    window.addEventListener(CART_UPDATED_EVENT, handleCartUpdated);
+
+    return () => {
+      window.removeEventListener(CART_UPDATED_EVENT, handleCartUpdated);
+    };
+  }, [refreshCartCount, shouldShowCart]);
 
   useEffect(() => {
     setIsAccountMenuOpen(false);
@@ -125,28 +170,41 @@ export function AuthNav() {
               className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-market-200 bg-white px-3.5 text-sm font-semibold text-market-900 shadow-[0_7px_18px_rgba(255,106,45,0.11)] transition-all hover:-translate-y-px hover:border-market-300 hover:bg-market-50 hover:shadow-[0_10px_24px_rgba(255,106,45,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2"
               href="/vendor"
             >
-              Sell with us
+              Vendre sur FireShop
             </Link>
           ) : (
             <Link
               className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#ffb331_0%,#ff6a2d_48%,#ff3d30_100%)] px-4 text-sm font-bold text-white shadow-[0_8px_20px_rgba(255,85,47,0.28)] transition-all hover:-translate-y-px hover:bg-[linear-gradient(135deg,#ffc04a_0%,#ff7436_46%,#ff4939_100%)] hover:shadow-[0_12px_26px_rgba(255,85,47,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2"
               href={user.role === "ADMIN" ? "/admin" : "/vendor"}
             >
-              Dashboard
+              Tableau de bord
             </Link>
           )}
 
-          {user.role !== "ADMIN" ? (
+          {shouldShowCart ? (
             <Link
-              aria-label="Panier"
+              aria-label={
+                cartItemCount && cartItemCount > 0
+                  ? `Panier, ${cartItemCount} article${cartItemCount > 1 ? "s" : ""}`
+                  : "Panier"
+              }
               className={cn(
-                "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-[0_7px_18px_rgba(15,23,42,0.075)] transition-all hover:-translate-y-px hover:border-market-200 hover:bg-market-50 hover:text-market-900 hover:shadow-[0_10px_22px_rgba(255,106,45,0.15)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2",
+                "relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-[0_7px_18px_rgba(15,23,42,0.075)] transition-all hover:-translate-y-px hover:border-market-200 hover:bg-market-50 hover:text-market-900 hover:shadow-[0_10px_22px_rgba(255,106,45,0.15)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2",
                 pathname === "/cart" && "border-market-300 bg-market-50 text-market-900 shadow-[0_9px_20px_rgba(255,106,45,0.18)]",
               )}
               href="/cart"
-              title="Panier"
+              title={
+                cartItemCount && cartItemCount > 0
+                  ? `Panier - ${cartItemCount} article${cartItemCount > 1 ? "s" : ""}`
+                  : "Panier"
+              }
             >
               <CartIcon />
+              {cartItemCount && cartItemCount > 0 ? (
+                <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-market-600 px-1.5 text-[11px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
+                  {cartItemCount > 99 ? "99+" : cartItemCount}
+                </span>
+              ) : null}
             </Link>
           ) : null}
 
@@ -220,7 +278,7 @@ export function AuthNav() {
                     onClick={handleLogout}
                     variant="secondary"
                   >
-                    {isLoggingOut ? "Deconnexion..." : "Deconnexion"}
+                    {isLoggingOut ? "Déconnexion..." : "Déconnexion"}
                   </Button>
                 </div>
               </div>
@@ -240,7 +298,7 @@ export function AuthNav() {
               className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#ffb331_0%,#ff6a2d_48%,#ff3d30_100%)] px-4 text-sm font-bold text-white shadow-[0_8px_20px_rgba(255,85,47,0.28)] transition-all hover:-translate-y-px hover:bg-[linear-gradient(135deg,#ffc04a_0%,#ff7436_46%,#ff4939_100%)] hover:shadow-[0_12px_26px_rgba(255,85,47,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-market-600/25 focus-visible:ring-offset-2"
             href="/auth/register"
           >
-            Creer un compte
+            Créer un compte
           </Link>
         </>
       )}

@@ -32,21 +32,21 @@ const ORDER_STEPS: OrderStatus[] = ORDER_STATUS_OPTIONS.filter(
 const TIMELINE_STATUSES: OrderStatus[] = [...ORDER_STEPS, "CANCELLED"];
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
-  PENDING: "Pending",
-  CONFIRMED: "Confirmed",
-  SHIPPED: "Shipped",
-  DELIVERED: "Delivered",
-  RETURNED: "Returned",
-  CANCELLED: "Cancelled",
+  PENDING: "En attente",
+  CONFIRMED: "Confirmée",
+  SHIPPED: "Expédiée",
+  DELIVERED: "Livrée",
+  RETURNED: "Retournée",
+  CANCELLED: "Annulée",
 };
 
 const STATUS_MEANINGS: Record<OrderStatus, string> = {
-  PENDING: "Pending: buyer submitted order",
-  CONFIRMED: "Confirmed: vendor confirmed order",
-  SHIPPED: "Shipped: sent to delivery",
-  DELIVERED: "Delivered: customer received product",
-  CANCELLED: "Cancelled: cancelled before delivery",
-  RETURNED: "Returned: delivery failed/returned",
+  PENDING: "En attente: la commande a été envoyée par l'acheteur",
+  CONFIRMED: "Confirmée: le vendeur a validé la commande",
+  SHIPPED: "Expédiée: la commande est en livraison",
+  DELIVERED: "Livrée: le client a reçu la commande",
+  CANCELLED: "Annulée: la commande a été annulée avant livraison",
+  RETURNED: "Retournée: la livraison a échoué ou a été retournée",
 };
 
 export function formatOrderStatus(status: OrderStatus) {
@@ -63,11 +63,11 @@ export function getOrderStatusOptions(currentStatus: OrderStatus) {
 
 export function getOrderStatusEffectNote(status: OrderStatus) {
   if (status === "CANCELLED" || status === "RETURNED") {
-    return "Stock will be restored automatically.";
+    return "Le stock sera restauré automatiquement.";
   }
 
   if (status === "DELIVERED") {
-    return "Final delivered order.";
+    return "Commande livrée finale.";
   }
 
   return null;
@@ -149,7 +149,7 @@ export function OrderTimeline({ status }: { status: OrderStatus }) {
                   {formatOrderStatus(step)}
                 </p>
                 {isCurrent ? (
-                  <p className="text-xs text-slate-500">Current status</p>
+                  <p className="text-xs text-slate-500">Statut actuel</p>
                 ) : null}
               </div>
             </div>
